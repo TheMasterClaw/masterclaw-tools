@@ -1,0 +1,20 @@
+{
+  "name": "masterclaw-tools",
+  "version": "0.1.0",
+  "description": "CLI utilities for MasterClaw",
+  "main": "bin/mc.js",
+  "bin": {
+    "mc": "./bin/mc.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["masterclaw", "cli", "automation"],
+  "author": "Rex deus",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^5.3.0",
+    "axios": "^1.6.0"
+  }
+}
