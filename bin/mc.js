@@ -14,6 +14,7 @@ const config = require('../lib/config');
 const docker = require('../lib/docker');
 const memory = require('../lib/memory');
 const task = require('../lib/task');
+const deploy = require('../lib/deploy');
 
 const program = new Command();
 
@@ -46,6 +47,9 @@ program.addCommand(memory);
 
 // Add task commands
 program.addCommand(task);
+
+// Add deployment commands
+program.addCommand(deploy);
 
 // Self-heal command
 program
