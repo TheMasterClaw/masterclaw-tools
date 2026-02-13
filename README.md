@@ -51,12 +51,24 @@ mc deploy status               # Show current deployment status
 mc deploy history              # Show deployment history
 ```
 
-### `mc logs [service]`
-View service logs
+### `mc logs`
+Comprehensive log management and viewing
 ```bash
-mc logs mc-backend
-mc logs mc-backend --follow --tail 50
+mc logs [service]              # View logs (service: traefik, interface, backend, core, gateway, chroma, watchtower, all)
+mc logs backend --follow       # Follow logs in real-time
+mc logs backend --lines 500    # Show last 500 lines
+mc logs backend --since 1h     # Show logs from last hour
+mc logs status                 # Show log sizes and rotation status
+mc logs clean                  # Clean up logs to free disk space
+mc logs clean --all            # Clean logs AND prune Docker system
+mc logs export                 # Export all logs for troubleshooting
+mc logs export backend         # Export specific service logs
+mc logs export --since 24h     # Export logs from last 24 hours
+mc logs search "ERROR"         # Search for pattern in all logs
+mc logs search "error" backend -i  # Case-insensitive search in backend
 ```
+
+**Services:** `traefik`, `interface`, `backend`, `core`, `gateway`, `chroma`, `watchtower`, or `all` (default)
 
 ### `mc backup`
 Trigger manual backup
@@ -137,6 +149,7 @@ The CLI uses these modules:
 - `lib/docker.js` - Docker Compose helpers
 - `lib/health.js` - Comprehensive health monitoring
 - `lib/deploy.js` - Deployment management
+- `lib/logs.js` - Log viewing, management, and export
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
 
