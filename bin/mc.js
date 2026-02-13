@@ -106,6 +106,20 @@ program
         console.log(chalk.red('❌'));
       }
     }
+
+    // Config security check
+    process.stdout.write('Checking config security... ');
+    try {
+      const audit = await config.securityAudit();
+      if (audit.secure) {
+        console.log(chalk.green('✅'));
+      } else {
+        console.log(chalk.yellow('⚠️'));
+        console.log(chalk.gray(`   Issues: ${audit.issues.join(', ')}`));
+      }
+    } catch (err) {
+      console.log(chalk.red('❌'));
+    }
   });
 
 // Chat command - quick chat with MasterClaw
@@ -153,6 +167,75 @@ program
       
     } catch (err) {
       spinner.fail(`Export failed: ${err.message}`);
+    }
+  });
+
+// Config security commands
+program
+  .command('config-audit')
+  .description('Run security audit on configuration files')
+  .action(async () => {
+    console.log(chalk.blue('🔒 MasterClaw Config Security Audit\n'));
+    
+    try {
+      const audit = await config.securityAudit();
+      
+      console.log(`Timestamp: ${audit.timestamp}`);
+      console.log(`Status: ${audit.secure ? chalk.green('✅ Secure') : chalk.red('❌ Issues Found')}\n`);
+      
+      if (audit.issues.length > 0) {
+        console.log(chalk.yellow('Issues:'));
+        audit.issues.forEach((issue, i) => {
+          console.log(`  ${i + 1}. ${issue}`);
+        });
+        console.log('');
+      }
+      
+      if (audit.recommendations.length > 0) {
+        console.log(chalk.cyan('Recommendations:'));
+        audit.recommendations.forEach((rec, i) => {
+          console.log(`  ${i + 1}. ${rec}`);
+        });
+        console.log('');
+      }
+      
+      if (audit.checks.hasSensitiveData) {
+        console.log(chalk.gray('ℹ️  Config contains sensitive data (tokens/keys)'));
+      }
+      
+      if (audit.secure) {
+        console.log(chalk.green('✅ Configuration is secure'));
+      } else {
+        console.log(chalk.yellow('⚠️  Run "mc config-fix" to fix permissions'));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`❌ Audit failed: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('config-fix')
+  .description('Fix configuration file permissions')
+  .action(async () => {
+    console.log(chalk.blue('🔧 Fixing Config Permissions\n'));
+    
+    try {
+      const result = await config.fixPermissions();
+      
+      if (result.success) {
+        console.log(chalk.green('✅ Permissions fixed:'));
+        result.results.forEach(r => {
+          console.log(`   ${r.path}: mode ${r.mode}`);
+        });
+      } else {
+        console.error(chalk.red(`❌ Failed: ${result.error}`));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`❌ Error: ${err.message}`));
+      process.exit(1);
     }
   });
 
