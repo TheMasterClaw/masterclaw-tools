@@ -1,20 +1,38 @@
 {
   "name": "masterclaw-tools",
-  "version": "0.1.0",
-  "description": "CLI utilities for MasterClaw",
+  "version": "0.2.0",
+  "description": "CLI utilities for MasterClaw - command your AI familiar from the terminal",
   "main": "bin/mc.js",
   "bin": {
     "mc": "./bin/mc.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "lint": "eslint lib/ bin/"
   },
-  "keywords": ["masterclaw", "cli", "automation"],
+  "keywords": [
+    "masterclaw",
+    "cli",
+    "automation",
+    "ai",
+    "companion"
+  ],
   "author": "Rex deus",
   "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
-    "commander": "^11.0.0",
-    "chalk": "^5.3.0",
-    "axios": "^1.6.0"
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "axios": "^1.6.2",
+    "ora": "^5.4.1",
+    "inquirer": "^8.2.6",
+    "node-fetch": "^2.7.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.56.0"
   }
 }

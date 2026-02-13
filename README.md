@@ -12,9 +12,8 @@ cd masterclaw-tools
 # Install globally
 npm install -g .
 
-# Or run locally
-npm install
-npx mc --help
+# Or run with npx
+npx .
 ```
 
 ## Commands
@@ -23,22 +22,20 @@ npx mc --help
 Check health of all MasterClaw services
 ```bash
 mc status
-# Output:
-# ✅ Interface: http://localhost:3000
-# ✅ Backend: http://localhost:3001
-# ✅ Gateway: http://localhost:3000
+mc status --watch  # Continuous monitoring
+```
+
+### `mc logs [service]`
+View service logs
+```bash
+mc logs mc-backend
+c logs mc-backend --follow --tail 50
 ```
 
 ### `mc backup`
 Trigger manual backup
 ```bash
-mc backup --full
-```
-
-### `mc logs`
-View service logs
-```bash
-mc logs --service backend --follow
+mc backup
 ```
 
 ### `mc config`
@@ -46,28 +43,52 @@ Manage configuration
 ```bash
 mc config get gateway.url
 mc config set gateway.url https://your-gateway.com
+mc config list
 ```
 
 ### `mc revive`
-Restart all services and restore connection
+Restart all services
 ```bash
 mc revive
+mc revive --pull  # Pull latest images first
 ```
 
-## Scripts
+### `mc update`
+Check for updates
+```bash
+mc update
+mc update --apply
+```
 
-- `health-check.js` — Service health monitoring
-- `backup.js` — Database and data backups
-- `deploy.js` — Deployment automation
-- `update.js` — Update check and apply
+## Configuration
 
-## Related Repos
+Config is stored in `~/.masterclaw/config.json`:
 
-- [masterclaw-interface](https://github.com/TheMasterClaw/MasterClawInterface) — The UI
-- [masterclaw-core](https://github.com/TheMasterClaw/masterclaw-core) — The AI brain
+```json
+{
+  "infraDir": "/path/to/infrastructure",
+  "gateway": {
+    "url": "http://localhost:3000",
+    "token": null
+  },
+  "api": {
+    "url": "http://localhost:3001"
+  }
+}
+```
+
+## Library
+
+The CLI uses these modules:
+- `lib/services.js` - Service health checking
+- `lib/config.js` - Configuration management
+- `lib/docker.js` - Docker Compose helpers
+
+## Related
+
 - [masterclaw-infrastructure](https://github.com/TheMasterClaw/masterclaw-infrastructure) — Deployment
-- [rex-deus](https://github.com/TheMasterClaw/rex-deus) — Personal configs (private)
-- [level100-studios](https://github.com/TheMasterClaw/level100-studios) — Parent org
+- [masterclaw-core](https://github.com/TheMasterClaw/masterclaw-core) — AI brain
+- [MasterClawInterface](https://github.com/TheMasterClaw/MasterClawInterface) — The UI
 
 ---
 
