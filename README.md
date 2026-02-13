@@ -18,6 +18,21 @@ npx .
 
 ## Commands
 
+### `mc health`
+Comprehensive health monitoring with multiple modes
+```bash
+mc health                      # Quick health check
+mc health --watch              # Continuous monitoring (refresh every 5s)
+mc health --notify             # Desktop notifications on status changes
+mc health --compact            # Cron-friendly output (exits 1 on failure)
+```
+
+Checks performed:
+- HTTP endpoint health (Interface, Backend, Core, Gateway)
+- Docker container status
+- SSL certificate expiration
+- Infrastructure health checks
+
 ### `mc status`
 Check health of all MasterClaw services
 ```bash
@@ -118,8 +133,12 @@ Config is stored in `~/.masterclaw/config.json`:
 
 The CLI uses these modules:
 - `lib/services.js` - Service health checking
-- `lib/config.js` - Configuration management
+- `lib/config.js` - Configuration management with security
 - `lib/docker.js` - Docker Compose helpers
+- `lib/health.js` - Comprehensive health monitoring
+- `lib/deploy.js` - Deployment management
+- `lib/memory.js` - Memory operations
+- `lib/task.js` - Task management
 
 ## Related
 
