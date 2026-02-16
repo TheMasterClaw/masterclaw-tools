@@ -2,6 +2,12 @@
 /**
  * MasterClaw CLI - mc
  * Enhanced with memory, task, and advanced commands
+ * 
+ * Features:
+ * - Comprehensive error handling with user-friendly messages
+ * - Security audit logging integration
+ * - Graceful shutdown handling
+ * - Proper exit codes for CI/CD integration
  */
 
 const { Command } = require('commander');
@@ -21,56 +27,82 @@ const logs = require('../lib/logs');
 const restore = require('../lib/restore');
 const completion = require('../lib/completion');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
+const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
+
+// Setup global error handlers for uncaught exceptions and unhandled rejections
+setupGlobalErrorHandlers();
 
 const program = new Command();
 
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.8.0')
+  .version('0.9.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
-// [Previous commands: status, logs, backup, config, revive, update remain the same]
+// =============================================================================
+// Core Commands
+// =============================================================================
 
-// Status command
+// Status command with comprehensive error handling
 program
   .command('status')
   .description('Check health of all MasterClaw services')
   .option('-w, --watch', 'watch mode - continuous monitoring')
-  .action(async (options) => {
-    // ... existing status implementation
-    console.log(chalk.blue('🐾 MasterClaw Status'));
+  .action(wrapCommand(async (options) => {
+    console.log(chalk.blue('🐾 MasterClaw Status\n'));
+    
     const statuses = await getAllStatuses();
+    
+    let healthyCount = 0;
+    let downCount = 0;
+    
     statuses.forEach(s => {
-      const icon = s.status === 'healthy' ? chalk.green('✅') : chalk.red('❌');
-      console.log(`  ${icon} ${s.name}: ${s.status}`);
+      const icon = s.status === 'healthy' ? chalk.green('✅') : 
+                   s.status === 'unhealthy' ? chalk.yellow('⚠️') : chalk.red('❌');
+      const statusColor = s.status === 'healthy' ? chalk.green : 
+                          s.status === 'unhealthy' ? chalk.yellow : chalk.red;
+      
+      console.log(`  ${icon} ${chalk.bold(s.name)}: ${statusColor(s.status)}`);
+      
+      if (s.responseTime) {
+        console.log(chalk.gray(`     Response: ${s.responseTime}`));
+      }
+      if (s.error) {
+        console.log(chalk.gray(`     Error: ${s.error}`));
+      }
+      
+      if (s.status === 'healthy') healthyCount++;
+      else downCount++;
     });
-  });
+    
+    console.log('');
+    if (downCount === 0) {
+      console.log(chalk.green(`✅ All ${healthyCount} services are healthy`));
+    } else {
+      console.log(chalk.yellow(`⚠️  ${healthyCount} healthy, ${downCount} down/unhealthy`));
+      console.log(chalk.gray('   Run "mc revive" to restart services'));
+      process.exit(ExitCode.SERVICE_UNAVAILABLE);
+    }
+  }, 'status'));
 
-// Add memory commands
+// =============================================================================
+// Subcommand Modules
+// =============================================================================
+
 program.addCommand(memory);
-
-// Add task commands
 program.addCommand(task);
-
-// Add session commands
 program.addCommand(session);
-
-// Add deployment commands
 program.addCommand(deploy);
-
-// Add health monitoring commands
 program.addCommand(health);
-
-// Add logs commands
 program.addCommand(logs);
-
-// Add restore commands
 program.addCommand(restore);
-
-// Add completion command
 program.addCommand(completion);
+
+// =============================================================================
+// Environment Commands
+// =============================================================================
 
 // Validate command - pre-flight environment check
 program
@@ -80,7 +112,7 @@ program
   .option('-q, --quiet', 'minimal output')
   .option('--fix-suggestions', 'show remediation steps')
   .option('--skip-ports', 'skip port availability checks')
-  .action(async (options) => {
+  .action(wrapCommand(async (options) => {
     if (options.fixSuggestions) {
       console.log(getRemediationSteps());
       return;
@@ -88,30 +120,25 @@ program
     
     const infraDir = await findInfraDir() || process.cwd();
     
-    try {
-      const results = await validate({
-        infraDir,
-        dev: options.dev,
-        skipPorts: options.skipPorts,
-      });
-      
-      printResults(results, { quiet: options.quiet });
-      
-      // Exit with error code if validation failed
-      if (!results.passed) {
-        process.exit(1);
-      }
-    } catch (err) {
-      console.error(chalk.red(`❌ Validation error: ${err.message}`));
-      process.exit(1);
+    const results = await validate({
+      infraDir,
+      dev: options.dev,
+      skipPorts: options.skipPorts,
+    });
+    
+    printResults(results, { quiet: options.quiet });
+    
+    // Exit with error code if validation failed
+    if (!results.passed) {
+      process.exit(ExitCode.VALIDATION_FAILED);
     }
-  });
+  }, 'validate'));
 
 // Self-heal command
 program
   .command('heal')
   .description('Self-heal MasterClaw - fix common issues')
-  .action(async () => {
+  .action(wrapCommand(async () => {
     console.log(chalk.blue('🩹 MasterClaw Self-Heal\n'));
     
     const issues = [];
@@ -129,26 +156,41 @@ program
     const downServices = statuses.filter(s => s.status === 'down');
     
     if (downServices.length > 0) {
-      issues.push(`${downServices.length} service(s) down`);
+      issues.push(`${downServices.length} service(s) down: ${downServices.map(s => s.name).join(', ')}`);
       fixes.push('Run: mc revive');
+    }
+    
+    // Check for common config issues
+    try {
+      const infraDir = await findInfraDir();
+      if (!infraDir) {
+        issues.push('Infrastructure directory not found');
+        fixes.push('Ensure you are in the masterclaw-infrastructure directory');
+      }
+    } catch (err) {
+      issues.push('Could not locate infrastructure directory');
+      fixes.push('Set --infra-dir or run from the correct directory');
     }
     
     if (issues.length === 0) {
       console.log(chalk.green('✅ No issues detected - MasterClaw is healthy!'));
     } else {
-      console.log(chalk.yellow('⚠️  Issues detected:\n'));
+      console.log(chalk.yellow(`⚠️  Found ${issues.length} issue(s):\n`));
       issues.forEach((issue, i) => {
-        console.log(`  ${i + 1}. ${issue}`);
+        console.log(`  ${chalk.red(`${i + 1}.`)} ${issue}`);
         console.log(chalk.gray(`     Fix: ${fixes[i]}`));
       });
+      console.log('');
+      console.log(chalk.cyan('💡 Run "mc doctor" for comprehensive diagnostics'));
+      process.exit(ExitCode.GENERAL_ERROR);
     }
-  });
+  }, 'heal'));
 
 // Doctor command - comprehensive diagnostics
 program
   .command('doctor')
   .description('Run comprehensive diagnostics')
-  .action(async () => {
+  .action(wrapCommand(async () => {
     console.log(chalk.blue('🔬 MasterClaw Doctor\n'));
     
     const checks = [
@@ -157,13 +199,21 @@ program
       { name: 'Services', check: getAllStatuses },
     ];
     
+    let passedChecks = 0;
+    let failedChecks = 0;
+    
     for (const { name, check } of checks) {
       process.stdout.write(`Checking ${name}... `);
       try {
         await check();
         console.log(chalk.green('✅'));
+        passedChecks++;
       } catch (err) {
         console.log(chalk.red('❌'));
+        if (process.env.MC_VERBOSE) {
+          console.log(chalk.gray(`   Error: ${err.message}`));
+        }
+        failedChecks++;
       }
     }
 
@@ -173,46 +223,64 @@ program
       const audit = await config.securityAudit();
       if (audit.secure) {
         console.log(chalk.green('✅'));
+        passedChecks++;
       } else {
         console.log(chalk.yellow('⚠️'));
         console.log(chalk.gray(`   Issues: ${audit.issues.join(', ')}`));
+        failedChecks++;
       }
     } catch (err) {
       console.log(chalk.red('❌'));
+      if (process.env.MC_VERBOSE) {
+        console.log(chalk.gray(`   Error: ${err.message}`));
+      }
+      failedChecks++;
     }
-  });
+    
+    console.log('');
+    console.log(chalk.cyan(`Results: ${chalk.green(`${passedChecks} passed`)}, ${chalk.red(`${failedChecks} failed`)}`));
+    
+    if (failedChecks > 0) {
+      console.log(chalk.gray('\nRun with --verbose for more details'));
+      process.exit(ExitCode.GENERAL_ERROR);
+    }
+  }, 'doctor'));
+
+// =============================================================================
+// Communication Commands
+// =============================================================================
 
 // Chat command - quick chat with MasterClaw
 program
   .command('chat <message>')
   .description('Send a quick message to MasterClaw')
-  .action(async (message) => {
+  .action(wrapCommand(async (message) => {
     console.log(chalk.blue('🐾 Sending message...\n'));
     
-    try {
-      const coreUrl = await config.get('core.url') || 'http://localhost:8000';
-      const axios = require('axios');
-      
-      const response = await axios.post(`${coreUrl}/v1/chat`, {
-        message,
-        session_id: `cli-${Date.now()}`,
-      });
-      
-      console.log(chalk.cyan('MasterClaw:'));
-      console.log(response.data.response);
-      
-    } catch (err) {
-      console.error(chalk.red(`❌ Error: ${err.message}`));
-      console.log(chalk.gray('Is the core service running? Try: mc revive'));
-    }
-  });
+    const coreUrl = await config.get('core.url') || 'http://localhost:8000';
+    const axios = require('axios');
+    
+    const response = await axios.post(`${coreUrl}/v1/chat`, {
+      message,
+      session_id: `cli-${Date.now()}`,
+    }, {
+      timeout: 30000, // 30 second timeout
+    });
+    
+    console.log(chalk.cyan('MasterClaw:'));
+    console.log(response.data.response);
+  }, 'chat'));
+
+// =============================================================================
+// Data Management Commands
+// =============================================================================
 
 // Export command - export all data
 program
   .command('export')
   .description('Export all MasterClaw data')
   .option('-o, --output <dir>', 'output directory', './mc-export')
-  .action(async (options) => {
+  .action(wrapCommand(async (options) => {
     const ora = require('ora');
     const spinner = ora('Exporting data...').start();
     
@@ -224,85 +292,82 @@ program
       await fs.writeJson(path.join(options.output, 'config.json'), cfg, { spaces: 2 });
       
       spinner.succeed(`Data exported to ${options.output}`);
-      
+      console.log(chalk.gray(`   Config: ${path.join(options.output, 'config.json')}`));
     } catch (err) {
       spinner.fail(`Export failed: ${err.message}`);
+      throw err; // Re-throw for error handler
     }
-  });
+  }, 'export'));
+
+// =============================================================================
+// Security Commands
+// =============================================================================
 
 // Config security commands
 program
   .command('config-audit')
   .description('Run security audit on configuration files')
-  .action(async () => {
+  .action(wrapCommand(async () => {
     console.log(chalk.blue('🔒 MasterClaw Config Security Audit\n'));
     
-    try {
-      const audit = await config.securityAudit();
-      
-      console.log(`Timestamp: ${audit.timestamp}`);
-      console.log(`Status: ${audit.secure ? chalk.green('✅ Secure') : chalk.red('❌ Issues Found')}\n`);
-      
-      if (audit.issues.length > 0) {
-        console.log(chalk.yellow('Issues:'));
-        audit.issues.forEach((issue, i) => {
-          console.log(`  ${i + 1}. ${issue}`);
-        });
-        console.log('');
-      }
-      
-      if (audit.recommendations.length > 0) {
-        console.log(chalk.cyan('Recommendations:'));
-        audit.recommendations.forEach((rec, i) => {
-          console.log(`  ${i + 1}. ${rec}`);
-        });
-        console.log('');
-      }
-      
-      if (audit.checks.hasSensitiveData) {
-        console.log(chalk.gray('ℹ️  Config contains sensitive data (tokens/keys)'));
-      }
-      
-      if (audit.secure) {
-        console.log(chalk.green('✅ Configuration is secure'));
-      } else {
-        console.log(chalk.yellow('⚠️  Run "mc config-fix" to fix permissions'));
-        process.exit(1);
-      }
-    } catch (err) {
-      console.error(chalk.red(`❌ Audit failed: ${err.message}`));
-      process.exit(1);
+    const audit = await config.securityAudit();
+    
+    console.log(`Timestamp: ${audit.timestamp}`);
+    console.log(`Status: ${audit.secure ? chalk.green('✅ Secure') : chalk.red('❌ Issues Found')}\n`);
+    
+    if (audit.issues.length > 0) {
+      console.log(chalk.yellow('Issues:'));
+      audit.issues.forEach((issue, i) => {
+        console.log(`  ${i + 1}. ${issue}`);
+      });
+      console.log('');
     }
-  });
+    
+    if (audit.recommendations.length > 0) {
+      console.log(chalk.cyan('Recommendations:'));
+      audit.recommendations.forEach((rec, i) => {
+        console.log(`  ${i + 1}. ${rec}`);
+      });
+      console.log('');
+    }
+    
+    if (audit.checks.hasSensitiveData) {
+      console.log(chalk.gray('ℹ️  Config contains sensitive data (tokens/keys)'));
+    }
+    
+    if (audit.secure) {
+      console.log(chalk.green('✅ Configuration is secure'));
+    } else {
+      console.log(chalk.yellow('⚠️  Run "mc config-fix" to fix permissions'));
+      process.exit(ExitCode.SECURITY_VIOLATION);
+    }
+  }, 'config-audit'));
 
 program
   .command('config-fix')
   .description('Fix configuration file permissions')
-  .action(async () => {
+  .action(wrapCommand(async () => {
     console.log(chalk.blue('🔧 Fixing Config Permissions\n'));
     
-    try {
-      const result = await config.fixPermissions();
-      
-      if (result.success) {
-        console.log(chalk.green('✅ Permissions fixed:'));
-        result.results.forEach(r => {
-          console.log(`   ${r.path}: mode ${r.mode}`);
-        });
-      } else {
-        console.error(chalk.red(`❌ Failed: ${result.error}`));
-        process.exit(1);
-      }
-    } catch (err) {
-      console.error(chalk.red(`❌ Error: ${err.message}`));
-      process.exit(1);
+    const result = await config.fixPermissions();
+    
+    if (result.success) {
+      console.log(chalk.green('✅ Permissions fixed:'));
+      result.results.forEach(r => {
+        console.log(`   ${r.path}: mode ${r.mode}`);
+      });
+    } else {
+      throw new Error(result.error || 'Failed to fix permissions');
     }
-  });
+  }, 'config-fix'));
 
-// Parse
+// =============================================================================
+// Parse and Execute
+// =============================================================================
+
 program.parse();
 
-// Show help if no command
+// Show help if no command provided
 if (!process.argv.slice(2).length) {
   program.outputHelp();
 }

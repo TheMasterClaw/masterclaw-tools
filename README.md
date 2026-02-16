@@ -46,6 +46,54 @@ All security violations throw `DockerSecurityError` with:
 - Detailed context (what was provided vs. expected)
 - Automatic logging for audit trails
 
+## Error Handling 🛡️
+
+MasterClaw CLI provides comprehensive error handling with user-friendly messages:
+
+### Features
+- **User-friendly error messages** — Technical errors translated to actionable guidance
+- **Automatic error classification** — Errors categorized by type (Docker, Network, Security, etc.)
+- **Context-aware suggestions** — Specific remediation steps for each error type
+- **Proper exit codes** — Standardized exit codes for CI/CD integration
+- **Sensitive data masking** — Tokens and passwords automatically redacted in logs
+- **Global error handling** — Unhandled exceptions and rejections caught gracefully
+- **Audit logging** — Security events automatically logged for forensics
+
+### Exit Codes
+| Code | Meaning | Use Case |
+|------|---------|----------|
+| `0` | Success | Command completed successfully |
+| `1` | General Error | Non-specific error occurred |
+| `2` | Invalid Arguments | Bad command-line arguments |
+| `3` | Docker Error | Docker daemon or command issues |
+| `4` | Service Unavailable | MasterClaw services not running |
+| `5` | Permission Denied | File or Docker permission issues |
+| `6` | Security Violation | Security check failed |
+| `7` | Config Error | Configuration file issues |
+| `8` | Network Error | Connection or timeout issues |
+| `9` | Validation Failed | Pre-flight validation failed |
+| `99` | Internal Error | Unexpected internal error |
+
+### Error Message Examples
+
+**Before (technical):**
+```
+Error: connect ECONNREFUSED 127.0.0.1:8000
+```
+
+**After (user-friendly):**
+```
+🌐 Error: Network error: Unable to connect to service
+   💡 Check your network connection and ensure the service is running.
+   Run: mc status to check service health
+```
+
+### Usage in CI/CD
+```bash
+mc validate || exit 9    # Exit with validation code on failure
+mc status || exit 4      # Exit with service unavailable code
+```
+
 ## Commands
 
 ### `mc validate`

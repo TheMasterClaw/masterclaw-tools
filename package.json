@@ -1,6 +1,6 @@
 {
   "name": "masterclaw-tools",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "CLI utilities for MasterClaw - command your AI familiar from the terminal",
   "main": "bin/mc.js",
   "bin": {
