@@ -266,6 +266,45 @@ The CLI uses these modules:
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support
+- `lib/security.js` - Centralized security utilities
+
+### Security Module (`lib/security.js`)
+
+Provides comprehensive security utilities for the MasterClaw ecosystem:
+
+```javascript
+const security = require('./lib/security');
+
+// Log sanitization - prevents log injection attacks
+const safe = security.sanitizeForLog(userInput, 1000);
+
+// Sensitive data masking
+const masked = security.maskSensitiveData('token=secret123');
+// Result: 'token=[REDACTED]'
+
+// Input validation
+if (security.isSafeString(userInput)) {
+  // Process input safely
+}
+
+// Path traversal detection
+if (security.containsPathTraversal(filePath)) {
+  throw new Error('Invalid path');
+}
+
+// Constant-time comparison for secrets
+if (security.constantTimeCompare(providedToken, storedToken)) {
+  // Authentication successful
+}
+```
+
+**Features:**
+- **Log Injection Prevention**: Removes control characters, newlines, and ANSI escape sequences
+- **Sensitive Data Masking**: Automatically masks tokens, passwords, API keys, and auth headers
+- **Input Validation**: Validates strings, IP addresses, and hostnames
+- **Path Security**: Detects path traversal attacks and sanitizes filenames
+- **Timing Attack Prevention**: Constant-time string comparison for secrets
+- **Safe JSON Handling**: Circular reference protection and depth limiting
 
 ## Related
 
