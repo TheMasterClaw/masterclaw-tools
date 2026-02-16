@@ -14,6 +14,7 @@ const config = require('../lib/config');
 const docker = require('../lib/docker');
 const memory = require('../lib/memory');
 const task = require('../lib/task');
+const session = require('../lib/session');
 const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
@@ -25,7 +26,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.7.0')
+  .version('0.8.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -51,6 +52,9 @@ program.addCommand(memory);
 
 // Add task commands
 program.addCommand(task);
+
+// Add session commands
+program.addCommand(session);
 
 // Add deployment commands
 program.addCommand(deploy);
