@@ -27,6 +27,13 @@ MasterClaw Tools implements comprehensive security hardening:
 - **File paths** — Path traversal attempts blocked
 - **Log options** — Bounds checking prevents DoS attacks
 
+### Prototype Pollution Protection
+Config operations are protected against prototype pollution attacks:
+- **Dangerous keys blocked** — `__proto__`, `constructor`, and `prototype` keys are rejected
+- **Config sanitization** — All loaded config is automatically sanitized
+- **Safe deep merge** — Config merging prevents prototype chain pollution
+- **Set operation validation** — Nested key paths are validated before assignment
+
 ### Security Commands
 ```bash
 mc config-audit    # Audit config file permissions

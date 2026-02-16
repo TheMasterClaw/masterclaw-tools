@@ -7,17 +7,16 @@ const {
   SERVICES,
   VALID_SERVICE_NAMES,
   MAX_HTTP_TIMEOUT,
+  MAX_PS_LINES,
+  MAX_OUTPUT_BUFFER_SIZE,
   validateServiceName,
   validateServiceNames,
   checkService,
   runDockerCompose,
   findInfraDir,
-} = require('../lib/services');
-
-const {
   DockerSecurityError,
   DockerCommandError,
-} = require('../lib/docker');
+} = require('../lib/services');
 
 // =============================================================================
 // Service Name Validation Tests
@@ -295,3 +294,52 @@ module.exports = {
   DockerSecurityError,
   DockerCommandError,
 };
+
+// =============================================================================
+// Security Constants Tests
+// =============================================================================
+
+describe('Security Constants', () => {
+  test('MAX_PS_LINES is defined with reasonable value', () => {
+    expect(MAX_PS_LINES).toBeDefined();
+    expect(MAX_PS_LINES).toBe(1000);
+    expect(MAX_PS_LINES).toBeGreaterThan(0);
+    expect(MAX_PS_LINES).toBeLessThanOrEqual(10000);
+  });
+
+  test('MAX_OUTPUT_BUFFER_SIZE is defined with reasonable value', () => {
+    expect(MAX_OUTPUT_BUFFER_SIZE).toBeDefined();
+    expect(MAX_OUTPUT_BUFFER_SIZE).toBe(10 * 1024 * 1024); // 10MB
+    expect(MAX_OUTPUT_BUFFER_SIZE).toBeGreaterThan(1024 * 1024); // At least 1MB
+  });
+
+  test('MAX_HTTP_TIMEOUT is reasonable', () => {
+    expect(MAX_HTTP_TIMEOUT).toBeDefined();
+    expect(MAX_HTTP_TIMEOUT).toBe(10000); // 10 seconds
+    expect(MAX_HTTP_TIMEOUT).toBeGreaterThan(0);
+    expect(MAX_HTTP_TIMEOUT).toBeLessThanOrEqual(60000); // Max 60 seconds
+  });
+});
+
+// =============================================================================
+// Error Class Exports Tests
+// =============================================================================
+
+describe('Error Class Exports', () => {
+  test('DockerSecurityError is properly exported from services', () => {
+    expect(DockerSecurityError).toBeDefined();
+    const err = new DockerSecurityError('Test', 'TEST_CODE');
+    expect(err).toBeInstanceOf(Error);
+    expect(err.isSecurityError).toBe(true);
+    expect(err.code).toBe('TEST_CODE');
+  });
+
+  test('DockerCommandError is properly exported from services', () => {
+    expect(DockerCommandError).toBeDefined();
+    const err = new DockerCommandError('Test', 'CODE', 1, 'stdout', 'stderr');
+    expect(err).toBeInstanceOf(Error);
+    expect(err.exitCode).toBe(1);
+    expect(err.stdout).toBe('stdout');
+    expect(err.stderr).toBe('stderr');
+  });
+});
