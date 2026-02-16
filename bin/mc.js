@@ -28,6 +28,7 @@ const restore = require('../lib/restore');
 const cleanup = require('../lib/cleanup');
 const completion = require('../lib/completion');
 const importer = require('../lib/import');
+const deps = require('../lib/deps');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
@@ -40,7 +41,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.11.0')
+  .version('0.12.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -104,6 +105,7 @@ program.addCommand(restore);
 program.addCommand(cleanup);
 program.addCommand(completion);
 program.addCommand(importer);
+program.addCommand(deps);
 
 // =============================================================================
 // Environment Commands
