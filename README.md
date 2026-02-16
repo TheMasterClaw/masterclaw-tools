@@ -98,6 +98,35 @@ mc update
 mc update --apply
 ```
 
+### `mc completion`
+Shell auto-completion support for bash, zsh, and fish
+```bash
+mc completion bash              # Print bash completion script
+mc completion bash --install    # Install bash completion
+mc completion zsh --install     # Install zsh completion
+mc completion fish --install    # Install fish completion
+mc completion status            # Check completion installation status
+```
+
+**Features:**
+- Auto-detects your shell if not specified
+- Completes commands, subcommands, and flags
+- Service name completion for `mc logs`
+- Smart file completion for restore commands
+- Install to standard shell directories automatically
+
+**Manual Installation:**
+```bash
+# Bash
+mc completion bash --print >> ~/.bashrc
+
+# Zsh
+mc completion zsh --print > ~/.zsh/completions/_mc
+
+# Fish
+mc completion fish --print > ~/.config/fish/completions/mc.fish
+```
+
 ## Deployment Strategy
 
 The `mc deploy` command implements **blue-green deployment** for zero-downtime updates:
@@ -152,6 +181,7 @@ The CLI uses these modules:
 - `lib/logs.js` - Log viewing, management, and export
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
+- `lib/completion.js` - Shell auto-completion support
 
 ## Related
 

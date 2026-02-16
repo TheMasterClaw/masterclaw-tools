@@ -17,13 +17,14 @@ const task = require('../lib/task');
 const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
+const completion = require('../lib/completion');
 
 const program = new Command();
 
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.5.0')
+  .version('0.6.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -58,6 +59,9 @@ program.addCommand(health);
 
 // Add logs commands
 program.addCommand(logs);
+
+// Add completion command
+program.addCommand(completion);
 
 // Self-heal command
 program
