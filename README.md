@@ -226,6 +226,51 @@ mc config set gateway.url https://your-gateway.com
 mc config list
 ```
 
+### `mc import`
+Import data from export files (complements `mc export`)
+```bash
+mc import all <file>           # Auto-detect and import (config, memory, or full)
+mc import all ./export.json --dry-run    # Preview import without changes
+mc import all ./export.json --force      # Overwrite existing data
+
+mc import config <file>        # Import only configuration
+mc import config ./config.json --dry-run
+mc import config ./config.json --force   # Overwrite existing values
+
+mc import memory <file>        # Import memories from backup
+mc import memory ./memories.json
+mc import memory ./memories.json --no-delay  # Skip delays (faster, riskier)
+
+mc import validate <file>      # Validate import file without importing
+```
+
+**Import Types:**
+- **full** — Complete export with config, memories, and sessions
+- **config** — Configuration settings only
+- **memory** — Memory/vector data only
+
+**Safety Features:**
+- `--dry-run` — Preview what would be imported without making changes
+- `--force` — Overwrite existing data (default: skip existing)
+- Interactive confirmation before importing (unless `--force` is used)
+- Automatic format detection with manual override (`--type`)
+- Validation of import file structure before importing
+- Progress reporting with error details
+
+**Examples:**
+```bash
+# Export and import workflow
+mc export --output ./backup-2024-02-16
+mc import all ./backup-2024-02-16/config.json --dry-run
+mc import all ./backup-2024-02-16/config.json
+
+# Migrate memories between instances
+mc import memory ./old-memories.json --no-delay
+
+# Validate before import
+mc import validate ./suspicious-export.json
+```
+
 ### `mc revive`
 Restart all services
 ```bash
@@ -358,6 +403,7 @@ The CLI uses these modules:
 - `lib/deploy.js` - Deployment management
 - `lib/logs.js` - Log viewing, management, export, and Loki integration
 - `lib/restore.js` - Disaster recovery and backup restoration
+- `lib/import.js` - Import data from export files (complements restore)
 - `lib/cleanup.js` - Session and memory cleanup management
 - `lib/validate.js` - Pre-flight environment validation
 - `lib/memory.js` - Memory operations

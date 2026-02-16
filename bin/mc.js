@@ -27,8 +27,10 @@ const logs = require('../lib/logs');
 const restore = require('../lib/restore');
 const cleanup = require('../lib/cleanup');
 const completion = require('../lib/completion');
+const importer = require('../lib/import');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
+const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -38,7 +40,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.10.0')
+  .version('0.11.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -101,6 +103,7 @@ program.addCommand(logs);
 program.addCommand(restore);
 program.addCommand(cleanup);
 program.addCommand(completion);
+program.addCommand(importer);
 
 // =============================================================================
 // Environment Commands
@@ -362,6 +365,74 @@ program
       throw new Error(result.error || 'Failed to fix permissions');
     }
   }, 'config-fix'));
+
+// Audit log verification command
+program
+  .command('audit-verify')
+  .description('Verify audit log integrity (detect tampering)')
+  .option('-v, --verbose', 'show detailed verification results')
+  .option('--hours <n>', 'check entries from last N hours', '168')
+  .option('--rotate-key', 'rotate the audit signing key (invalidates old signatures)')
+  .action(wrapCommand(async (options) => {
+    if (options.rotateKey) {
+      console.log(chalk.blue('🔑 Rotating Audit Signing Key\n'));
+      console.log(chalk.yellow('⚠️  Warning: This will invalidate all existing audit signatures'));
+      console.log(chalk.gray('   New entries will be signed with the new key.\n'));
+      
+      const result = await rotateSigningKey();
+      if (result) {
+        console.log(chalk.green('✅ Audit signing key rotated successfully'));
+        console.log(chalk.gray('   Future entries will use the new key'));
+      } else {
+        throw new Error('Failed to rotate audit signing key');
+      }
+      return;
+    }
+
+    console.log(chalk.blue('🔒 Verifying Audit Log Integrity\n'));
+    
+    const hours = parseInt(options.hours, 10) || 168;
+    const result = await verifyAuditIntegrity({ 
+      verbose: options.verbose,
+      hours,
+    });
+    
+    console.log(chalk.cyan('Results:'));
+    console.log(`  Files checked: ${result.filesChecked.length}`);
+    console.log(`  Total entries: ${result.totalEntries}`);
+    console.log(`  Valid signatures: ${chalk.green(result.validSignatures)}`);
+    
+    if (result.unsignedEntries > 0) {
+      console.log(`  Unsigned entries: ${chalk.yellow(result.unsignedEntries)}`);
+    }
+    
+    if (result.invalidSignatures > 0) {
+      console.log(`  ${chalk.red('⚠️  INVALID signatures: ' + result.invalidSignatures)}`);
+    }
+    
+    console.log('');
+    
+    if (result.invalidSignatures > 0) {
+      console.log(chalk.red('❌ Audit log integrity check FAILED'));
+      console.log(chalk.yellow('⚠️  Some entries may have been tampered with!'));
+      
+      if (options.verbose) {
+        console.log(chalk.gray('\nDetails:'));
+        result.errors.forEach(err => {
+          console.log(chalk.gray(`  ${err.file}:${err.line} - ${err.error}`));
+        });
+      } else {
+        console.log(chalk.gray('\nRun with --verbose for details'));
+      }
+      
+      process.exit(ExitCode.SECURITY_VIOLATION);
+    } else if (result.valid) {
+      console.log(chalk.green('✅ Audit log integrity verified'));
+      console.log(chalk.gray('   All entries have valid signatures'));
+    } else {
+      console.log(chalk.yellow('⚠️  Audit log verification completed with warnings'));
+    }
+  }, 'audit-verify'));
 
 // =============================================================================
 // Parse and Execute
