@@ -40,6 +40,51 @@ mc config-audit    # Audit config file permissions
 mc config-fix      # Fix config file permissions (600)
 ```
 
+### Security Monitoring 🛡️
+
+MasterClaw includes comprehensive security monitoring and threat detection:
+
+```bash
+mc security                    # Run full security scan
+mc security --status           # Quick security status check
+mc security --hours 48         # Scan last 48 hours
+mc security --json             # Output results as JSON
+```
+
+**Threat Detection:**
+- **Brute Force Detection** — Identifies repeated failed authentication attempts
+- **Rate Limit Violations** — Detects command flooding and abuse patterns
+- **Error Spike Detection** — Flags unusual error rates indicating attacks
+- **Privilege Escalation** — Monitors for suspicious configuration changes
+- **Suspicious Patterns** — Identifies reconnaissance and after-hours activity
+- **Configuration Drift** — Detects unauthorized permission changes
+
+**Example Output:**
+```
+🔒 MasterClaw Security Scan
+   Analyzing last 24 hours...
+
+Scan Summary:
+  Scan ID: scan-1708101234567
+  Duration: 234ms
+  Time window: Last 24 hours
+
+⚠️  Threats detected: 2
+   High: 1
+   Medium: 1
+
+Detailed Threat Information:
+
+  1. BRUTE_FORCE (high)
+     Source: 192.168.1.100
+     Time: 2024-02-16T10:30:00Z
+     Failed attempts: 8 in 15 minutes
+
+Recommendations:
+  • Review high-severity threats and take appropriate action
+  • Review audit logs for more details: mc logs query
+```
+
 ### Error Handling
 All security violations throw `DockerSecurityError` with:
 - Descriptive error codes for programmatic handling
@@ -448,6 +493,38 @@ if (security.constantTimeCompare(providedToken, storedToken)) {
 - **Path Security**: Detects path traversal attacks and sanitizes filenames
 - **Timing Attack Prevention**: Constant-time string comparison for secrets
 - **Safe JSON Handling**: Circular reference protection and depth limiting
+
+### Security Monitor Module (`lib/security-monitor.js`)
+
+Provides comprehensive security monitoring and threat detection:
+
+```javascript
+const securityMonitor = require('./lib/security-monitor');
+
+// Run full security scan
+const scanResults = await securityMonitor.runSecurityScan({ hours: 24 });
+
+// Detect specific threat types
+const bruteForce = await securityMonitor.detectBruteForce(24);
+const rateViolations = await securityMonitor.detectRateLimitViolations(24);
+const errorSpikes = await securityMonitor.detectErrorSpikes(24);
+const privilegeEscalation = await securityMonitor.detectPrivilegeEscalation(24);
+
+// Get quick status
+const status = await securityMonitor.getQuickSecurityStatus();
+
+// Monitor configuration for drift
+const configHealth = await securityMonitor.monitorConfiguration();
+```
+
+**Features:**
+- **Brute Force Detection**: Sliding window analysis of failed authentication attempts
+- **Rate Limit Violations**: Command flooding and abuse pattern detection
+- **Error Spike Detection**: Anomalous error rate monitoring
+- **Privilege Escalation**: Rapid config change and permission pattern detection
+- **Suspicious Activity**: Reconnaissance and after-hours activity detection
+- **Configuration Drift**: File permission and hash-based change detection
+- **Automated Response**: High-severity threats automatically logged to audit trail
 
 ## Related
 

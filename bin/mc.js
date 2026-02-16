@@ -32,6 +32,7 @@ const deps = require('../lib/deps');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
+const securityMonitor = require('../lib/security-monitor');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -435,6 +436,126 @@ program
       console.log(chalk.yellow('⚠️  Audit log verification completed with warnings'));
     }
   }, 'audit-verify'));
+
+// =============================================================================
+// Security Monitor Commands
+// =============================================================================
+
+program
+  .command('security')
+  .description('Security monitoring and threat detection')
+  .option('-s, --scan', 'run full security scan', false)
+  .option('-w, --watch', 'continuous security monitoring', false)
+  .option('--hours <n>', 'hours to look back for analysis', '24')
+  .option('--json', 'output results as JSON', false)
+  .option('--status', 'quick security status check', false)
+  .action(wrapCommand(async (options) => {
+    // Quick status mode
+    if (options.status) {
+      const status = await securityMonitor.getQuickSecurityStatus();
+      
+      if (options.json) {
+        console.log(JSON.stringify(status, null, 2));
+      } else {
+        const statusIcon = status.status === 'ok' ? chalk.green('✅') : chalk.yellow('⚠️');
+        console.log(`${statusIcon} Security Status: ${status.status.toUpperCase()}`);
+        console.log(chalk.gray(`   Last hour: ${status.lastHour.totalEvents} events, ${status.lastHour.securityViolations} violations`));
+        console.log(chalk.gray(`   Config secure: ${status.configSecure ? 'Yes' : 'No'}`));
+      }
+      
+      if (status.status !== 'ok') {
+        process.exit(ExitCode.SECURITY_VIOLATION);
+      }
+      return;
+    }
+
+    // Full scan mode (default)
+    const hours = parseInt(options.hours, 10) || 24;
+    
+    if (!options.json) {
+      console.log(chalk.blue('🔒 MasterClaw Security Scan'));
+      console.log(chalk.gray(`   Analyzing last ${hours} hours...\n`));
+    }
+
+    const ora = require('ora');
+    const spinner = ora('Scanning for security threats...').start();
+    
+    const result = await securityMonitor.runSecurityScan({ hours });
+    
+    spinner.stop();
+
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      // Display results
+      console.log(chalk.cyan('Scan Summary:'));
+      console.log(`  Scan ID: ${result.scanId}`);
+      console.log(`  Duration: ${result.scanDurationMs}ms`);
+      console.log(`  Time window: Last ${hours} hours\n`);
+
+      // Threat summary
+      const { summary } = result;
+      const totalThreats = summary.critical + summary.high + summary.medium + summary.low;
+      
+      if (totalThreats === 0) {
+        console.log(chalk.green('✅ No threats detected'));
+      } else {
+        console.log(chalk.yellow(`⚠️  Threats detected: ${totalThreats}`));
+        if (summary.critical > 0) console.log(chalk.red(`   Critical: ${summary.critical}`));
+        if (summary.high > 0) console.log(chalk.red(`   High: ${summary.high}`));
+        if (summary.medium > 0) console.log(chalk.yellow(`   Medium: ${summary.medium}`));
+        if (summary.low > 0) console.log(chalk.gray(`   Low: ${summary.low}`));
+      }
+
+      // Configuration health
+      if (!result.configHealthy) {
+        console.log(chalk.red('\n❌ Configuration issues detected:'));
+        result.configIssues.forEach(issue => {
+          console.log(chalk.red(`   • ${issue}`));
+        });
+      }
+
+      // Detailed threat information
+      if (result.threats.length > 0) {
+        console.log(chalk.cyan('\nDetailed Threat Information:'));
+        result.threats.slice(0, 5).forEach((threat, i) => {
+          const levelColor = threat.level === 'critical' ? chalk.red :
+                            threat.level === 'high' ? chalk.red :
+                            threat.level === 'medium' ? chalk.yellow : chalk.gray;
+          console.log(`\n  ${i + 1}. ${levelColor(threat.type.toUpperCase())} (${levelColor(threat.level)})`);
+          console.log(`     Source: ${threat.source}`);
+          console.log(`     Time: ${threat.timestamp}`);
+          if (threat.details.description) {
+            console.log(`     Description: ${threat.details.description}`);
+          }
+        });
+
+        if (result.threats.length > 5) {
+          console.log(chalk.gray(`\n  ... and ${result.threats.length - 5} more threats`));
+        }
+      }
+
+      // Recommendations
+      if (totalThreats > 0) {
+        console.log(chalk.cyan('\nRecommendations:'));
+        if (summary.critical > 0) {
+          console.log(chalk.red('  • Immediate action required: Investigate critical threats'));
+        }
+        if (summary.high > 0) {
+          console.log(chalk.yellow('  • Review high-severity threats and take appropriate action'));
+        }
+        if (!result.configHealthy) {
+          console.log('  • Run "mc config-fix" to resolve configuration issues');
+        }
+        console.log('  • Review audit logs for more details: mc logs query');
+      }
+    }
+
+    // Exit with error if critical threats found
+    if (result.summary.critical > 0) {
+      process.exit(ExitCode.SECURITY_VIOLATION);
+    }
+  }, 'security'));
 
 // =============================================================================
 // Parse and Execute
