@@ -230,6 +230,42 @@ mc update --apply
 
 ### `mc completion`
 Shell auto-completion support for bash, zsh, and fish
+
+### `mc cleanup`
+Clean up old sessions and orphaned memories to reclaim disk space
+```bash
+mc cleanup                     # Interactive cleanup (default: 30 days)
+mc cleanup --days 90           # Delete sessions older than 90 days
+mc cleanup --days 30 --force   # Skip confirmation prompt
+mc cleanup --dry-run           # Preview what would be deleted
+mc cleanup --sessions-only     # Only clean sessions, keep memories
+mc cleanup status              # Show cleanup status and recommendations
+mc cleanup schedule            # Show how to schedule automatic cleanup
+```
+
+**Why cleanup?**
+- Sessions and chat history accumulate over time
+- Old data consumes disk space
+- Performance degrades with very large datasets
+- Most sessions are only relevant for a short time
+
+**Recommended schedule:**
+- Weekly: `mc cleanup --days 30` (keep last month)
+- Monthly: `mc cleanup --days 90` (aggressive cleanup)
+
+**Automatic scheduling via cron:**
+```bash
+# Add to crontab (crontab -e)
+0 2 * * 0 /usr/local/bin/mc cleanup --days 30 --force
+```
+
+**Safety features:**
+- Confirmation prompt before deletion (use `--force` to skip)
+- Dry-run mode to preview changes
+- Shows session age distribution before cleanup
+- Displays statistics before and after cleanup
+
+Shell auto-completion support for bash, zsh, and fish
 ```bash
 mc completion bash              # Print bash completion script
 mc completion bash --install    # Install bash completion
@@ -310,6 +346,7 @@ The CLI uses these modules:
 - `lib/deploy.js` - Deployment management
 - `lib/logs.js` - Log viewing, management, and export
 - `lib/restore.js` - Disaster recovery and backup restoration
+- `lib/cleanup.js` - Session and memory cleanup management
 - `lib/validate.js` - Pre-flight environment validation
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management

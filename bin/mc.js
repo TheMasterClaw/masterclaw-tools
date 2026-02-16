@@ -25,6 +25,7 @@ const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
 const restore = require('../lib/restore');
+const cleanup = require('../lib/cleanup');
 const completion = require('../lib/completion');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
@@ -37,7 +38,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.9.0')
+  .version('0.10.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -98,6 +99,7 @@ program.addCommand(deploy);
 program.addCommand(health);
 program.addCommand(logs);
 program.addCommand(restore);
+program.addCommand(cleanup);
 program.addCommand(completion);
 
 // =============================================================================
