@@ -33,6 +33,7 @@ const { validate, printResults, getRemediationSteps } = require('../lib/validate
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
 const securityMonitor = require('../lib/security-monitor');
+const rateLimiter = require('../lib/rate-limiter');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -316,6 +317,9 @@ program
   .command('config-audit')
   .description('Run security audit on configuration files')
   .action(wrapCommand(async () => {
+    // Enforce rate limiting
+    await rateLimiter.enforceRateLimit('config-audit', { command: 'config-audit' });
+
     console.log(chalk.blue('🔒 MasterClaw Config Security Audit\n'));
     
     const audit = await config.securityAudit();
@@ -355,6 +359,9 @@ program
   .command('config-fix')
   .description('Fix configuration file permissions')
   .action(wrapCommand(async () => {
+    // Enforce rate limiting
+    await rateLimiter.enforceRateLimit('config-fix', { command: 'config-fix' });
+
     console.log(chalk.blue('🔧 Fixing Config Permissions\n'));
     
     const result = await config.fixPermissions();
@@ -377,6 +384,9 @@ program
   .option('--hours <n>', 'check entries from last N hours', '168')
   .option('--rotate-key', 'rotate the audit signing key (invalidates old signatures)')
   .action(wrapCommand(async (options) => {
+    // Enforce rate limiting
+    await rateLimiter.enforceRateLimit('audit-verify', { command: 'audit-verify' });
+
     if (options.rotateKey) {
       console.log(chalk.blue('🔑 Rotating Audit Signing Key\n'));
       console.log(chalk.yellow('⚠️  Warning: This will invalidate all existing audit signatures'));
@@ -438,6 +448,77 @@ program
   }, 'audit-verify'));
 
 // =============================================================================
+// Rate Limiting Commands
+// =============================================================================
+
+program
+  .command('rate-limit')
+  .description('Manage command rate limiting')
+  .option('-s, --status', 'show current rate limit status', false)
+  .option('--reset <command>', 'reset rate limit for a specific command (requires --force)')
+  .option('--reset-all', 'reset all rate limits (requires --force)')
+  .option('--force', 'force reset without confirmation (security-sensitive)')
+  .action(wrapCommand(async (options) => {
+    const chalk = require('chalk');
+
+    // Handle reset operations
+    if (options.reset || options.resetAll) {
+      if (!options.force) {
+        console.log(chalk.red('❌ Rate limit reset requires --force flag'));
+        console.log(chalk.gray('   This is a security-sensitive operation'));
+        process.exit(ExitCode.SECURITY_VIOLATION);
+      }
+
+      try {
+        await rateLimiter.resetRateLimits(options.resetAll ? null : options.reset, true);
+        console.log(chalk.green('✅ Rate limits reset successfully'));
+        if (options.reset) {
+          console.log(chalk.gray(`   Reset command: ${options.reset}`));
+        } else {
+          console.log(chalk.gray('   Reset all commands'));
+        }
+        return;
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    // Default: show status
+    console.log(chalk.blue('🚦 MasterClaw Rate Limit Status\n'));
+
+    const status = await rateLimiter.getRateLimitStatus();
+
+    console.log(chalk.cyan('Command Rate Limits (sliding window):\n'));
+
+    // Group commands by sensitivity
+    const highSecurity = ['config-audit', 'config-fix', 'audit-verify', 'security', 'restore'];
+    const deployment = ['deploy', 'revive'];
+    const dataMod = ['cleanup', 'import'];
+    const readOnly = ['status', 'health', 'logs', 'validate'];
+
+    function printGroup(title, commands, color) {
+      console.log(color(`${title}:`));
+      for (const cmd of commands) {
+        if (status[cmd]) {
+          const s = status[cmd];
+          const usageColor = s.remaining === 0 ? chalk.red :
+                            s.remaining < s.limit * 0.2 ? chalk.yellow : chalk.green;
+          console.log(`  ${chalk.bold(cmd.padEnd(15))} ${usageColor(`${s.used}/${s.limit}`)} ${chalk.gray(`(resets at ${new Date(s.resetTime).toLocaleTimeString()})`)}`);
+        }
+      }
+      console.log('');
+    }
+
+    printGroup('🔒 High Security', highSecurity, chalk.red);
+    printGroup('🚀 Deployment', deployment, chalk.yellow);
+    printGroup('💾 Data Modification', dataMod, chalk.cyan);
+    printGroup('📖 Read-Only', readOnly, chalk.green);
+
+    console.log(chalk.gray('Rate limits help prevent abuse and accidental command flooding.'));
+    console.log(chalk.gray('Limits are per-minute (except where noted).'));
+  }, 'rate-limit'));
+
+// =============================================================================
 // Security Monitor Commands
 // =============================================================================
 
@@ -450,6 +531,9 @@ program
   .option('--json', 'output results as JSON', false)
   .option('--status', 'quick security status check', false)
   .action(wrapCommand(async (options) => {
+    // Enforce rate limiting for security command
+    await rateLimiter.enforceRateLimit('security', { command: 'security' });
+
     // Quick status mode
     if (options.status) {
       const status = await securityMonitor.getQuickSecurityStatus();

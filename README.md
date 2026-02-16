@@ -27,6 +27,34 @@ MasterClaw Tools implements comprehensive security hardening:
 - **File paths** — Path traversal attempts blocked
 - **Log options** — Bounds checking prevents DoS attacks
 
+### Rate Limiting 🚦
+MasterClaw CLI includes command rate limiting to prevent abuse:
+
+```bash
+mc rate-limit              # Show current rate limit status
+mc rate-limit --status     # Same as above
+```
+
+**Rate limits by command category:**
+| Category | Commands | Limit | Window |
+|----------|----------|-------|--------|
+| 🔒 High Security | `config-audit`, `config-fix`, `audit-verify`, `security`, `restore` | 3-10 | 1-5 min |
+| 🚀 Deployment | `deploy`, `revive` | 5-10 | 1-5 min |
+| 💾 Data Modification | `cleanup`, `import` | 5-10 | 1 min |
+| 📖 Read-Only | `status`, `health`, `logs`, `validate` | 30-60 | 1 min |
+
+**Reset rate limits (security-sensitive):**
+```bash
+mc rate-limit --reset security --force        # Reset specific command
+mc rate-limit --reset-all --force             # Reset all commands
+```
+
+Rate limiting protects against:
+- Command flooding and accidental script loops
+- Brute force attacks on sensitive operations
+- Resource exhaustion from rapid command execution
+- Automated attack scripts
+
 ### Prototype Pollution Protection
 Config operations are protected against prototype pollution attacks:
 - **Dangerous keys blocked** — `__proto__`, `constructor`, and `prototype` keys are rejected
