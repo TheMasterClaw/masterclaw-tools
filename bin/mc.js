@@ -18,13 +18,14 @@ const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
 const completion = require('../lib/completion');
+const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 
 const program = new Command();
 
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.6.0')
+  .version('0.7.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -62,6 +63,41 @@ program.addCommand(logs);
 
 // Add completion command
 program.addCommand(completion);
+
+// Validate command - pre-flight environment check
+program
+  .command('validate')
+  .description('Validate environment before deployment')
+  .option('-d, --dev', 'development mode (skip production checks)')
+  .option('-q, --quiet', 'minimal output')
+  .option('--fix-suggestions', 'show remediation steps')
+  .option('--skip-ports', 'skip port availability checks')
+  .action(async (options) => {
+    if (options.fixSuggestions) {
+      console.log(getRemediationSteps());
+      return;
+    }
+    
+    const infraDir = await findInfraDir() || process.cwd();
+    
+    try {
+      const results = await validate({
+        infraDir,
+        dev: options.dev,
+        skipPorts: options.skipPorts,
+      });
+      
+      printResults(results, { quiet: options.quiet });
+      
+      // Exit with error code if validation failed
+      if (!results.passed) {
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`❌ Validation error: ${err.message}`));
+      process.exit(1);
+    }
+  });
 
 // Self-heal command
 program

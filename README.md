@@ -16,7 +16,55 @@ npm install -g .
 npx .
 ```
 
+## Security 🔒
+
+MasterClaw Tools implements comprehensive security hardening:
+
+### Input Validation
+- **Service names** — Validated against whitelist before use
+- **Container names** — Sanitized to prevent command injection
+- **Docker Compose args** — Only allowed commands permitted
+- **File paths** — Path traversal attempts blocked
+- **Log options** — Bounds checking prevents DoS attacks
+
+### Security Commands
+```bash
+mc config-audit    # Audit config file permissions
+mc config-fix      # Fix config file permissions (600)
+```
+
+### Error Handling
+All security violations throw `DockerSecurityError` with:
+- Descriptive error codes for programmatic handling
+- Detailed context (what was provided vs. expected)
+- Automatic logging for audit trails
+
 ## Commands
+
+### `mc validate`
+Pre-flight environment validation before deployment
+```bash
+mc validate                    # Validate environment for production
+mc validate --dev              # Development mode (skip production checks)
+mc validate --quiet            # Minimal output
+mc validate --skip-ports       # Skip port availability checks
+mc validate --fix-suggestions  # Show remediation steps for common issues
+```
+
+**Validates:**
+- Docker and Docker Compose installation and running state
+- Required environment variables (`DOMAIN`, `ACME_EMAIL`, `GATEWAY_TOKEN`)
+- Recommended environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
+- Domain and email format validity
+- Gateway token strength (minimum 16 characters)
+- Placeholder values in configuration
+- Port availability (80, 443)
+- System resources (memory, disk space)
+- Data directory write permissions
+
+**Exit codes:**
+- `0` — Validation passed, ready for deployment
+- `1` — Validation failed, fix issues before deploying
 
 ### `mc health`
 Comprehensive health monitoring with multiple modes
@@ -179,6 +227,7 @@ The CLI uses these modules:
 - `lib/health.js` - Comprehensive health monitoring
 - `lib/deploy.js` - Deployment management
 - `lib/logs.js` - Log viewing, management, and export
+- `lib/validate.js` - Pre-flight environment validation
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support
