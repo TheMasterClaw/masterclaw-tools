@@ -169,9 +169,21 @@ mc logs export backend         # Export specific service logs
 mc logs export --since 24h     # Export logs from last 24 hours
 mc logs search "ERROR"         # Search for pattern in all logs
 mc logs search "error" backend -i  # Case-insensitive search in backend
+
+# Loki Log Aggregation Queries (requires monitoring stack)
+mc logs query                  # Follow all logs via Loki
+mc logs query backend          # Query logs for specific service
+mc logs query --service core   # Query specific service
+mc logs query --errors         # Show only error logs
+mc logs query --errors --since 24h  # Errors from last 24h
+mc logs query '{service="mc-core"} |= "error"'  # Raw LogQL query
+mc logs query --follow         # Real-time log tail via Loki
+mc logs query --labels         # List available Loki labels
 ```
 
 **Services:** `traefik`, `interface`, `backend`, `core`, `gateway`, `chroma`, `watchtower`, or `all` (default)
+
+**Note:** `mc logs query` requires the monitoring stack (Loki) to be running. Start it with `make monitor`.
 
 ### `mc backup`
 Trigger manual backup
@@ -344,7 +356,7 @@ The CLI uses these modules:
 - `lib/docker.js` - Docker Compose helpers
 - `lib/health.js` - Comprehensive health monitoring
 - `lib/deploy.js` - Deployment management
-- `lib/logs.js` - Log viewing, management, and export
+- `lib/logs.js` - Log viewing, management, export, and Loki integration
 - `lib/restore.js` - Disaster recovery and backup restoration
 - `lib/cleanup.js` - Session and memory cleanup management
 - `lib/validate.js` - Pre-flight environment validation
