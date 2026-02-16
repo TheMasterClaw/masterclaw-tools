@@ -18,6 +18,40 @@ describe('Validate Module', () => {
     await fs.remove(tempDir);
   });
 
+  describe('Security Constants', () => {
+    test('DANGEROUS_ENV_KEYS contains expected values', () => {
+      expect(validate.DANGEROUS_ENV_KEYS.has('__proto__')).toBe(true);
+      expect(validate.DANGEROUS_ENV_KEYS.has('constructor')).toBe(true);
+      expect(validate.DANGEROUS_ENV_KEYS.has('prototype')).toBe(true);
+    });
+
+    test('MAX_ENV_FILE_SIZE is reasonable', () => {
+      expect(validate.MAX_ENV_FILE_SIZE).toBe(1024 * 1024); // 1MB
+      expect(validate.MAX_ENV_FILE_SIZE).toBeGreaterThan(0);
+    });
+
+    test('MAX_ENV_FILE_LINES is reasonable', () => {
+      expect(validate.MAX_ENV_FILE_LINES).toBe(10000);
+      expect(validate.MAX_ENV_FILE_LINES).toBeGreaterThan(0);
+    });
+  });
+
+  describe('isDangerousEnvKey', () => {
+    test('identifies dangerous keys', () => {
+      expect(validate.isDangerousEnvKey('__proto__')).toBe(true);
+      expect(validate.isDangerousEnvKey('constructor')).toBe(true);
+      expect(validate.isDangerousEnvKey('prototype')).toBe(true);
+    });
+
+    test('allows safe keys', () => {
+      expect(validate.isDangerousEnvKey('DOMAIN')).toBe(false);
+      expect(validate.isDangerousEnvKey('TOKEN')).toBe(false);
+      expect(validate.isDangerousEnvKey('__proto')).toBe(false); // Missing underscore
+      expect(validate.isDangerousEnvKey('constructor__')).toBe(false);
+      expect(validate.isDangerousEnvKey('Prototype')).toBe(false); // Case sensitive
+    });
+  });
+
   describe('parseEnvFile', () => {
     test('parses basic env file', async () => {
       const envContent = `
@@ -63,6 +97,129 @@ TOKEN=secret
     test('returns empty object for missing file', async () => {
       const vars = await validate.parseEnvFile(path.join(tempDir, 'nonexistent.env'));
       expect(vars).toEqual({});
+    });
+
+    test('creates object with null prototype (safe from pollution)', async () => {
+      const envContent = 'DOMAIN=example.com';
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      // Object should not have prototype chain
+      expect(Object.getPrototypeOf(vars)).toBeNull();
+    });
+
+    test('skips dangerous __proto__ key', async () => {
+      const envContent = `
+DOMAIN=example.com
+__proto__=polluted
+TOKEN=secret
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      expect(vars.DOMAIN).toBe('example.com');
+      expect(vars.TOKEN).toBe('secret');
+      expect(vars.__proto__).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('__proto__')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('skips dangerous constructor key', async () => {
+      const envContent = `
+DOMAIN=example.com
+constructor=polluted
+TOKEN=secret
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      expect(vars.DOMAIN).toBe('example.com');
+      expect(vars.TOKEN).toBe('secret');
+      expect(vars.constructor).toBeUndefined();
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('skips dangerous prototype key', async () => {
+      const envContent = `
+DOMAIN=example.com
+prototype=polluted
+TOKEN=secret
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      expect(vars.DOMAIN).toBe('example.com');
+      expect(vars.TOKEN).toBe('secret');
+      expect(vars.prototype).toBeUndefined();
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('prevents prototype pollution attack simulation', async () => {
+      const envContent = `
+DOMAIN=example.com
+__proto__.isAdmin=true
+constructor.prototype.isAdmin=true
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      // Verify object prototype was not polluted
+      expect(({}).isAdmin).toBeUndefined();
+      expect(vars.isAdmin).toBeUndefined();
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('rejects files exceeding size limit', async () => {
+      const largeContent = 'A'.repeat(validate.MAX_ENV_FILE_SIZE + 1);
+      await fs.writeFile(path.join(tempDir, '.env'), largeContent);
+      
+      await expect(
+        validate.parseEnvFile(path.join(tempDir, '.env'))
+      ).rejects.toThrow('exceeds maximum allowed');
+    });
+
+    test('rejects files with too many lines', async () => {
+      const manyLines = Array(validate.MAX_ENV_FILE_LINES + 1).fill('KEY=value').join('\n');
+      await fs.writeFile(path.join(tempDir, '.env'), manyLines);
+      
+      await expect(
+        validate.parseEnvFile(path.join(tempDir, '.env'))
+      ).rejects.toThrow('line count');
+    });
+
+    test('handles env files at size boundary', async () => {
+      const boundaryContent = 'A'.repeat(validate.MAX_ENV_FILE_SIZE);
+      await fs.writeFile(path.join(tempDir, '.env'), boundaryContent);
+      
+      // Should not throw
+      await expect(
+        validate.parseEnvFile(path.join(tempDir, '.env'))
+      ).resolves.toBeDefined();
+    });
+
+    test('handles env files at line count boundary', async () => {
+      const boundaryLines = Array(validate.MAX_ENV_FILE_LINES).fill('KEY=value').join('\n');
+      await fs.writeFile(path.join(tempDir, '.env'), boundaryLines);
+      
+      // Should not throw
+      await expect(
+        validate.parseEnvFile(path.join(tempDir, '.env'))
+      ).resolves.toBeDefined();
     });
   });
 
@@ -189,6 +346,22 @@ GATEWAY_TOKEN=your-token-here
       
       expect(results.warnings.some(w => w.message.includes('placeholder'))).toBe(true);
     });
+
+    test('handles malicious env files gracefully', async () => {
+      const maliciousEnv = `
+DOMAIN=example.com
+__proto__={"isAdmin":true}
+constructor={"evil":true}
+GATEWAY_TOKEN=valid_token_123456789
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), maliciousEnv);
+      
+      const results = await validate.validate({ infraDir: tempDir });
+      
+      // Should not crash and should properly validate
+      expect(results).toBeDefined();
+      expect(results.checks).toBeDefined();
+    });
   });
 
   describe('checkSystemResources', () => {
@@ -199,6 +372,47 @@ GATEWAY_TOKEN=your-token-here
       expect(resources).toHaveProperty('freeMemoryGB');
       expect(resources).toHaveProperty('memoryUsagePercent');
       expect(parseFloat(resources.totalMemoryGB)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Prototype Pollution Security Integration', () => {
+    test('env file parsing does not pollute Object.prototype', async () => {
+      // Save original prototype
+      const originalProto = Object.prototype.toString;
+      
+      const maliciousEnv = `
+__proto__.polluted=true
+constructor.prototype.polluted=true
+prototype.polluted=true
+`;
+      await fs.writeFile(path.join(tempDir, '.env'), maliciousEnv);
+      
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      // Verify Object.prototype was not polluted
+      expect(({}).polluted).toBeUndefined();
+      expect(Object.prototype.polluted).toBeUndefined();
+      expect(Object.prototype.toString).toBe(originalProto);
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('validates that parsed object has null prototype', async () => {
+      const envContent = 'DOMAIN=example.com\nTOKEN=secret';
+      await fs.writeFile(path.join(tempDir, '.env'), envContent);
+      
+      const vars = await validate.parseEnvFile(path.join(tempDir, '.env'));
+      
+      // Object.create(null) objects don't have standard methods
+      expect(vars.toString).toBeUndefined();
+      expect(vars.hasOwnProperty).toBeUndefined();
+      expect(vars.constructor).toBeUndefined();
+      
+      // But they can still be used normally
+      expect(vars.DOMAIN).toBe('example.com');
+      expect(vars.TOKEN).toBe('secret');
+      expect(Object.keys(vars)).toEqual(['DOMAIN', 'TOKEN']);
     });
   });
 });
