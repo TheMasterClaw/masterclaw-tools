@@ -131,6 +131,33 @@ Trigger manual backup
 mc backup
 ```
 
+### `mc restore`
+Disaster recovery - restore from backups with interactive selection
+```bash
+mc restore                     # List available backups
+mc restore list                # Same as above
+mc restore list -n 20          # Show last 20 backups
+mc restore preview <name>      # Preview backup contents without restoring
+mc restore run                 # Interactive restore (select backup, confirm)
+mc restore run <backup-name>   # Restore specific backup
+mc restore run -y              # Skip confirmations (use with caution!)
+mc restore run --dry-run       # Preview what would be restored
+```
+
+**Safety Features:**
+- Interactive backup selection with size and age display
+- Preview mode shows components included in backup
+- Double confirmation required for actual restore
+- Shows warning if services are running
+- Dry-run mode for testing
+
+**Components Restored:**
+- Backend data (SQLite, uploads)
+- Gateway configuration and data
+- Core AI memory and state
+- ChromaDB vector embeddings
+- Environment configuration (saved as `.env.restored` for review)
+
 ### `mc config`
 Manage configuration
 ```bash
@@ -234,6 +261,7 @@ The CLI uses these modules:
 - `lib/health.js` - Comprehensive health monitoring
 - `lib/deploy.js` - Deployment management
 - `lib/logs.js` - Log viewing, management, and export
+- `lib/restore.js` - Disaster recovery and backup restoration
 - `lib/validate.js` - Pre-flight environment validation
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management

@@ -18,6 +18,7 @@ const session = require('../lib/session');
 const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
+const restore = require('../lib/restore');
 const completion = require('../lib/completion');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 
@@ -64,6 +65,9 @@ program.addCommand(health);
 
 // Add logs commands
 program.addCommand(logs);
+
+// Add restore commands
+program.addCommand(restore);
 
 // Add completion command
 program.addCommand(completion);
