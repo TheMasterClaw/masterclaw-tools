@@ -34,6 +34,7 @@ const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/erro
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
 const securityMonitor = require('../lib/security-monitor');
 const rateLimiter = require('../lib/rate-limiter');
+const ssl = require('../lib/ssl');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -108,6 +109,7 @@ program.addCommand(cleanup);
 program.addCommand(completion);
 program.addCommand(importer);
 program.addCommand(deps);
+program.addCommand(ssl);
 
 // =============================================================================
 // Environment Commands
