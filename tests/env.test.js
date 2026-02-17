@@ -136,9 +136,9 @@ ACME_EMAIL=admin@example.com
   describe('validateEnv', () => {
     test('validates required variables', () => {
       const env = {
-        DOMAIN: 'example.com',
+        DOMAIN: 'myapp.example.org',
         ACME_EMAIL: 'admin@example.com',
-        GATEWAY_TOKEN: 'token123',
+        GATEWAY_TOKEN: 'secure-token-12345',
       };
       const result = validateEnv(env);
       expect(result.valid).toBe(true);
@@ -165,9 +165,9 @@ ACME_EMAIL=admin@example.com
     
     test('validates email format', () => {
       const env = {
-        DOMAIN: 'example.com',
+        DOMAIN: 'myapp.example.org',
         ACME_EMAIL: 'invalid-email',
-        GATEWAY_TOKEN: 'token123',
+        GATEWAY_TOKEN: 'secure-token-12345',
       };
       const result = validateEnv(env);
       expect(result.issues.some(i => i.type === 'format' && i.key === 'ACME_EMAIL')).toBe(true);
@@ -175,9 +175,9 @@ ACME_EMAIL=admin@example.com
     
     test('validates URL format (no protocol)', () => {
       const env = {
-        DOMAIN: 'https://example.com',
+        DOMAIN: 'https://myapp.example.org',
         ACME_EMAIL: 'admin@example.com',
-        GATEWAY_TOKEN: 'token123',
+        GATEWAY_TOKEN: 'secure-token-12345',
       };
       const result = validateEnv(env);
       expect(result.issues.some(i => i.type === 'format' && i.key === 'DOMAIN')).toBe(true);
@@ -185,9 +185,9 @@ ACME_EMAIL=admin@example.com
     
     test('generates warnings for recommended variables', () => {
       const env = {
-        DOMAIN: 'example.com',
+        DOMAIN: 'myapp.example.org',
         ACME_EMAIL: 'admin@example.com',
-        GATEWAY_TOKEN: 'token123',
+        GATEWAY_TOKEN: 'secure-token-12345',
       };
       const result = validateEnv(env);
       expect(result.warnings.some(w => w.type === 'recommended')).toBe(true);
@@ -195,9 +195,9 @@ ACME_EMAIL=admin@example.com
     
     test('skips recommended check when specified', () => {
       const env = {
-        DOMAIN: 'example.com',
+        DOMAIN: 'myapp.example.org',
         ACME_EMAIL: 'admin@example.com',
-        GATEWAY_TOKEN: 'token123',
+        GATEWAY_TOKEN: 'secure-token-12345',
       };
       const result = validateEnv(env, { skipRecommended: true });
       expect(result.warnings.filter(w => w.type === 'recommended')).toHaveLength(0);
