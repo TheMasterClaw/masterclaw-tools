@@ -30,6 +30,7 @@ const completion = require('../lib/completion');
 const importer = require('../lib/import');
 const deps = require('../lib/deps');
 const cost = require('../lib/cost');
+const env = require('../lib/env');
 const backupVerify = require('../lib/backup-verify');
 const update = require('../lib/update');
 const info = require('../lib/info');
@@ -41,6 +42,8 @@ const securityMonitor = require('../lib/security-monitor');
 const rateLimiter = require('../lib/rate-limiter');
 const ssl = require('../lib/ssl');
 const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = require('../lib/exec');
+const { runDoctor } = require('../lib/doctor');
+const benchmark = require('../lib/benchmark');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -120,6 +123,61 @@ program.addCommand(ssl);
 program.addCommand(backupVerify);
 program.addCommand(update);
 program.addCommand(notify);
+program.addCommand(env.program);
+
+// =============================================================================
+// Benchmark Commands - Performance Testing
+// =============================================================================
+
+program
+  .command('benchmark')
+  .description('Run performance benchmarks against MasterClaw services')
+  .option('--skip-llm', 'skip LLM provider benchmarks')
+  .option('--skip-memory', 'skip memory store benchmarks')
+  .option('--skip-api', 'skip API endpoint benchmarks')
+  .option('--iterations <n>', 'number of iterations per test', '3')
+  .option('--api-url <url>', 'API base URL', 'http://localhost:8000')
+  .action(wrapCommand(async (options) => {
+    const results = await benchmark.runBenchmarks({
+      skipLLM: options.skipLlm,
+      skipMemory: options.skipMemory,
+      skipAPI: options.skipApi,
+      iterations: parseInt(options.iterations, 10),
+      apiUrl: options.apiUrl,
+    });
+    
+    if (!results) {
+      process.exit(ExitCode.SERVICE_UNAVAILABLE);
+    }
+    
+    if (!results.success) {
+      process.exit(ExitCode.GENERAL_ERROR);
+    }
+  }, 'benchmark'));
+
+program
+  .command('benchmark-history')
+  .description('View benchmark history and trends')
+  .option('-a, --all', 'show all runs (default: last 10)')
+  .action(wrapCommand(async (options) => {
+    await benchmark.showHistory({ all: options.all });
+  }, 'benchmark-history'));
+
+program
+  .command('benchmark-compare')
+  .description('Compare recent benchmark runs')
+  .action(wrapCommand(async () => {
+    await benchmark.compareRuns();
+  }, 'benchmark-compare'));
+
+program
+  .command('benchmark-export')
+  .description('Export benchmark history to file')
+  .option('-f, --format <format>', 'export format (json, csv)', 'json')
+  .option('-o, --output <path>', 'output file path')
+  .action(wrapCommand(async (options) => {
+    await benchmark.exportResults(options.format, options.output);
+  }, 'benchmark-export'));
 
 // =============================================================================
 // Info Command
@@ -132,6 +190,29 @@ program
   .action(wrapCommand(async (options) => {
     await info.showInfo(options);
   }, 'info'));
+
+// =============================================================================
+// Doctor Command - Comprehensive Diagnostics
+// =============================================================================
+
+program
+  .command('doctor')
+  .description('Run comprehensive diagnostics and troubleshooting')
+  .option('-c, --category <category>', 'run checks for specific category (system,docker,services,config,network,security,performance)')
+  .option('--fix', 'attempt automatic fixes (interactive)', false)
+  .option('-j, --json', 'output as JSON', false)
+  .action(wrapCommand(async (options) => {
+    const report = await runDoctor({
+      category: options.category,
+      fix: options.fix,
+      json: options.json,
+    });
+    
+    // Exit with error if critical or high issues found
+    if (!report.summary.healthy) {
+      process.exit(ExitCode.VALIDATION_FAILED);
+    }
+  }, 'doctor'));
 
 // =============================================================================
 // Environment Commands

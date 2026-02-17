@@ -294,6 +294,96 @@ System:
 ...
 ```
 
+### `mc benchmark` 🆕
+Performance benchmarking for LLM providers, memory store, and API endpoints.
+Compare providers, track performance trends, and detect regressions.
+
+```bash
+# Run full benchmark suite
+mc benchmark
+
+# Run specific benchmarks only
+mc benchmark --skip-llm      # Skip LLM provider tests
+mc benchmark --skip-memory   # Skip memory store tests
+mc benchmark --skip-api      # Skip API endpoint tests
+
+# Customize test iterations
+mc benchmark --iterations 5
+
+# Use different API endpoint
+mc benchmark --api-url http://localhost:8000
+```
+
+**Benchmarks:**
+| Test | Measures |
+|------|----------|
+| LLM | Response time, time-to-first-token, throughput by provider/model |
+| Memory | Add entry latency, search latency at scale |
+| API | Endpoint latency under concurrent load |
+
+**Example Output:**
+```
+🐾 MasterClaw Performance Benchmark
+
+🧪 LLM Provider Benchmarks
+
+Test: short (10 expected tokens)
+  GPT-4o... ✓ 450ms avg, 22.2 t/s
+  GPT-4o Mini... ✓ 280ms avg, 35.7 t/s
+  Claude 3 Opus... ✓ 520ms avg, 19.2 t/s
+
+💾 Memory Store Benchmarks
+  Add entry: ✓ 15ms avg per entry
+  Search: ✓ 45ms avg per search
+
+📊 Results Summary
+═══════════════════════════════════════════════════════════
+
+LLM Performance:
+─────────────────────────────────────────────────────
+Model                Test       Avg Time     Throughput   Success
+─────────────────────────────────────────────────────
+GPT-4o               short      450ms        22.2 t/s     ✓ 100%
+GPT-4o Mini          short      280ms        35.7 t/s     ✓ 100%
+Claude 3 Opus        short      520ms        19.2 t/s     ✓ 100%
+```
+
+### `mc benchmark-history`
+View benchmark history and track performance trends over time.
+
+```bash
+mc benchmark-history         # Show last 10 runs
+mc benchmark-history --all   # Show all historical runs
+```
+
+### `mc benchmark-compare`
+Compare recent benchmark runs to detect performance changes.
+
+```bash
+mc benchmark-compare
+```
+
+**Output:**
+```
+📊 Benchmark Comparison
+
+LLM Performance Changes:
+──────────────────────────────────────────────────────
+  GPT-4o (short)
+    ↑ +5.2%  428ms → 450ms
+  GPT-4o Mini (short)
+    ↓ -12.1%  319ms → 280ms 🟢
+```
+
+### `mc benchmark-export`
+Export benchmark history for analysis in external tools.
+
+```bash
+mc benchmark-export                    # Export as JSON
+mc benchmark-export --format csv       # Export as CSV
+mc benchmark-export -o report.json     # Custom output file
+```
+
 ### `mc validate`
 Pre-flight environment validation before deployment
 ```bash
@@ -318,6 +408,64 @@ mc validate --fix-suggestions  # Show remediation steps for common issues
 **Exit codes:**
 - `0` — Validation passed, ready for deployment
 - `1` — Validation failed, fix issues before deploying
+
+### `mc env` 🆕
+Environment configuration management — compare, validate, and sync environment configurations between dev/staging/prod
+
+```bash
+# Compare environments
+mc env diff                      # Compare .env with .env.prod
+mc env diff .env .env.staging    # Compare specific files
+mc env diff --show-values        # Show actual values (default: masked)
+
+# Validate environment configuration
+mc env check                     # Validate .env file
+mc env check .env.prod           # Validate specific file
+mc env check --json              # Output as JSON
+
+# Sync configuration between environments
+mc env sync                      # Sync from .env.prod to .env
+mc env sync .env.prod .env.dev   # Sync specific files
+mc env sync --dry-run            # Preview changes without applying
+
+# Generate new environment template
+mc env template                  # Create .env template
+mc env template -o .env.dev      # Output to specific file
+mc env template --include-optional  # Include API keys
+```
+
+**Features:**
+- **Compare** — Detect added, removed, and modified variables between environments
+- **Validate** — Check required variables, email/URL formats, and placeholder values
+- **Sync** — Copy non-sensitive configuration between environments (with backups)
+- **Security** — Sensitive values (tokens, API keys) are masked by default
+
+**Environment Schema:**
+| Category | Variables |
+|----------|-----------|
+| Required | `DOMAIN`, `ACME_EMAIL`, `GATEWAY_TOKEN` |
+| Sensitive | `GATEWAY_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` |
+| Recommended | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `RETENTION_DAYS` |
+
+**Example workflow:**
+```bash
+# 1. Validate production config
+mc env check .env.prod
+
+# 2. Compare dev with prod
+mc env diff .env.dev .env.prod
+
+# 3. Sync non-sensitive config from prod to dev
+mc env sync .env.prod .env.dev --dry-run  # Preview first
+mc env sync .env.prod .env.dev            # Apply changes
+
+# 4. Generate template for new environment
+mc env template -o .env.staging
+```
+
+**Exit codes:**
+- `0` — Environment valid/synced successfully
+- `1` — Validation failed or differences found
 
 ### `mc health`
 Comprehensive health monitoring with multiple modes
