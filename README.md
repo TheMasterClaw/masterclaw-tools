@@ -376,10 +376,43 @@ mc revive --pull  # Pull latest images first
 ```
 
 ### `mc update`
-Check for updates
+Update MasterClaw services and CLI to the latest versions
 ```bash
+mc update                      # Update all services and check for CLI updates
+mc update --check              # Check for available updates without applying
+mc update --dry-run            # Show what would be updated without making changes
+mc update --services           # Update Docker services only (skip CLI check)
+mc update --cli-only           # Check CLI updates only (skip Docker services)
+mc update version              # Show current versions of all components
+mc update version --json       # Output versions as JSON
+```
+
+**Features:**
+- **Check mode**: Preview available updates without applying
+- **Dry-run**: See exactly what would change before committing
+- **Selective updates**: Update only services or only CLI
+- **Version tracking**: Shows current vs available versions
+- **Safe by default**: Requires explicit flags to apply changes
+
+**Update workflow:**
+```bash
+# 1. Check what updates are available
+mc update --check
+
+# 2. Preview what would change (dry run)
+mc update --dry-run
+
+# 3. Apply updates
 mc update
-mc update --apply
+
+# 4. Verify services are healthy after update
+mc status
+```
+
+**CI/CD integration:**
+```bash
+# Automated update with health check
+mc update --services && mc health --compact || echo "Update failed"
 ```
 
 ### `mc completion`
@@ -503,6 +536,7 @@ The CLI uses these modules:
 - `lib/import.js` - Import data from export files (complements restore)
 - `lib/cleanup.js` - Session and memory cleanup management
 - `lib/validate.js` - Pre-flight environment validation
+- `lib/update.js` - Update management for services and CLI
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support

@@ -31,6 +31,7 @@ const importer = require('../lib/import');
 const deps = require('../lib/deps');
 const cost = require('../lib/cost');
 const backupVerify = require('../lib/backup-verify');
+const update = require('../lib/update');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
@@ -114,6 +115,7 @@ program.addCommand(deps);
 program.addCommand(cost);
 program.addCommand(ssl);
 program.addCommand(backupVerify);
+program.addCommand(update);
 
 // =============================================================================
 // Environment Commands
