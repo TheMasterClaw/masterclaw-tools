@@ -177,6 +177,63 @@ mc info              # Pretty-printed system overview
 mc info --json       # Machine-readable JSON output
 ```
 
+### `mc notify` 🆕
+Manage alert notifications across multiple channels (WhatsApp, Discord, Slack, Telegram).
+Configure, test, and monitor alerts for service downtime, SSL expiration, costs, and security threats.
+
+```bash
+# Check notification status
+mc notify status              # Show all channels and alert configuration
+mc notify status --json       # Output as JSON
+
+# Start/stop the alert webhook server
+mc notify start               # Start webhook server
+mc notify start --port 9090   # Start on custom port
+mc notify stop                # Stop webhook server
+mc notify restart             # Restart webhook server
+
+# Configure notification channels
+mc notify config whatsapp --number "+1234567890"
+mc notify config discord --webhook "https://discord.com/api/webhooks/..."
+mc notify config slack --webhook "https://hooks.slack.com/services/..."
+mc notify config telegram --token "123456:ABC..." --chat-id "-1001234567890"
+
+# Enable/disable channels
+mc notify enable discord      # Enable Discord notifications
+mc notify disable slack       # Disable Slack notifications
+
+# Send test notifications
+mc notify test                # Test all enabled channels
+mc notify test discord        # Test specific channel
+mc notify test --severity critical  # Test with critical severity
+
+# Configure alert types
+mc notify alerts --list                      # List all alert types
+mc notify alerts --enable sslExpiring        # Enable SSL expiration alerts
+mc notify alerts --disable highCost          # Disable cost threshold alerts
+```
+
+**Alert Types:**
+| Alert Type | Description |
+|------------|-------------|
+| `serviceDown` | When services become unhealthy or stop |
+| `sslExpiring` | SSL certificate expiration warnings (14 days) |
+| `highCost` | LLM usage costs exceeding thresholds |
+| `securityThreat` | Detected security threats and violations |
+
+**Example Configuration:**
+```bash
+# Set up Discord notifications
+mc notify config discord --webhook "https://discord.com/api/webhooks/123/abc"
+mc notify enable discord
+
+# Test the configuration
+mc notify test discord
+
+# Start the webhook server to receive alerts
+mc notify start
+```
+
 **Displays:**
 - CLI version, Node.js version, and platform info
 - Core API version and status (if running)
@@ -646,6 +703,7 @@ The CLI uses these modules:
 - `lib/memory.js` - Memory operations
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support
+- `lib/notify.js` - **NEW: Notification channel management**
 - `lib/security.js` - Centralized security utilities
 - `lib/exec.js` - Container execution (mc exec, mc containers)
 - `lib/rate-limiter.js` - Command rate limiting

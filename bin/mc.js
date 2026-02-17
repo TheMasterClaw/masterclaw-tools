@@ -33,6 +33,7 @@ const cost = require('../lib/cost');
 const backupVerify = require('../lib/backup-verify');
 const update = require('../lib/update');
 const info = require('../lib/info');
+const notify = require('../lib/notify');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
@@ -49,7 +50,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.14.0')
+  .version('0.15.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -118,6 +119,7 @@ program.addCommand(cost);
 program.addCommand(ssl);
 program.addCommand(backupVerify);
 program.addCommand(update);
+program.addCommand(notify);
 
 // =============================================================================
 // Info Command
