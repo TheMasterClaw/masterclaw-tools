@@ -45,6 +45,7 @@ const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = req
 const { runDoctor } = require('../lib/doctor');
 const benchmark = require('../lib/benchmark');
 const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
+const maintenance = require('../lib/maintenance');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -54,7 +55,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.17.0')  // Added smoke-test feature
+  .version('0.18.0')  // Added maintenance command
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -125,6 +126,7 @@ program.addCommand(backupVerify);
 program.addCommand(update);
 program.addCommand(notify);
 program.addCommand(env.program);
+program.addCommand(maintenance);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing

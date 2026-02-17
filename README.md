@@ -862,6 +862,92 @@ mc cleanup schedule            # Show how to schedule automatic cleanup
 - Shows session age distribution before cleanup
 - Displays statistics before and after cleanup
 
+### `mc maintenance` 🆕
+Run comprehensive system maintenance — combines health checks, cleanup, backup verification, and Docker optimization
+```bash
+mc maintenance                           # Interactive maintenance (recommended)
+mc maintenance --force                   # Skip all confirmations
+mc maintenance --days 30                 # Clean sessions older than 30 days
+mc maintenance --no-cleanup              # Skip session cleanup
+mc maintenance --no-docker               # Skip Docker pruning
+mc maintenance --no-verify               # Skip backup verification
+mc maintenance --logs                    # Also clean old container logs
+mc maintenance --report                  # Generate maintenance report file
+mc maintenance status                    # Quick status check
+mc maintenance schedule                  # Show cron scheduling examples
+```
+
+**What maintenance does:**
+1. **Health Checks** — Verifies Core API, disk space, session stats
+2. **Session Cleanup** — Removes old sessions based on retention policy
+3. **Backup Verification** — Checks backup freshness and integrity
+4. **Docker Pruning** — Removes unused images, containers, and volumes
+5. **Log Cleanup** — Optionally cleans old container logs (with `--logs`)
+
+**Why use maintenance instead of individual commands?**
+- **Unified workflow** — One command for routine upkeep
+- **Safety checks** — Health verification before destructive operations
+- **Comprehensive** — Covers all aspects of system hygiene
+- **Report generation** — Audit trail for compliance (with `--report`)
+
+**Example maintenance session:**
+```
+🔧 MasterClaw Maintenance
+
+📊 Phase 1: Health Checks
+=========================
+  ✅ Core API: Healthy (v1.0.0)
+  ✅ Disk: 45% used (45GB/100GB)
+  📈 Sessions: 1,245 total, 23 active (24h)
+
+🧹 Phase 2: Session Cleanup
+===========================
+  ⚠️  Found 156 sessions older than 30 days
+     Total messages to remove: 3,420
+  Delete 156 old sessions? [y/N] y
+  ✓ Deleted 156 sessions
+
+💾 Phase 3: Backup Verification
+================================
+  ✅ 12 backup(s) found
+     Latest: masterclaw_backup_20250217.tar.gz
+     Size: 450MB
+     Age: 4.2 hours
+     Status: Fresh
+
+🐳 Phase 4: Docker Maintenance
+===============================
+  Current Usage:
+     Images: 2.4GB (1.2GB reclaimable)
+     Volumes: 450MB (120MB reclaimable)
+  Prune unused Docker images, containers, and volumes? [y/N] y
+  ✅ Docker pruning complete
+
+📋 Maintenance Summary
+======================
+  ✅ Passed: 4
+  Duration: 12.3s
+🐾 Maintenance complete! System is healthy.
+```
+
+**Recommended schedules:**
+```bash
+# Weekly maintenance (keep 30 days of sessions)
+0 3 * * 0 /usr/local/bin/mc maintenance --force --days 30 --report
+
+# Daily lightweight maintenance (keep 14 days, no Docker pruning)
+0 2 * * * /usr/local/bin/mc maintenance --force --days 14 --no-docker
+
+# Monthly deep maintenance (keep 90 days, full optimization)
+0 4 1 * * /usr/local/bin/mc maintenance --force --days 90 --logs --report
+```
+
+**Report output:**
+When using `--report`, a JSON file is generated with full maintenance details:
+```bash
+mc maintenance --report  # Creates maintenance-report-<timestamp>.json
+```
+
 Shell auto-completion support for bash, zsh, and fish
 ```bash
 mc completion bash              # Print bash completion script
