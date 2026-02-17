@@ -649,9 +649,11 @@ describe('Security: Metadata Sanitization', () => {
       current = current.nested;
       depth++;
     }
-    // Should have stopped at depth 10 with a string marker
+    // Should have stopped at depth 10 (level 10), and level 11 should have MaxDepthExceeded markers
     expect(depth).toBe(10);
-    expect(current).toBe('[MaxDepthExceeded]');
+    // current should now be the level 11 object with all values truncated
+    expect(current.level).toBe('[MaxDepthExceeded]');
+    expect(current.nested).toBe('[MaxDepthExceeded]');
   });
 
   test('limits total keys in metadata', () => {
