@@ -1044,6 +1044,12 @@ mc cleanup schedule            # Show how to schedule automatic cleanup
 - Performance degrades with very large datasets
 - Most sessions are only relevant for a short time
 
+**Performance:**
+Uses the bulk deletion API (`/v1/sessions/bulk-delete`) for efficient cleanup:
+- Single API call instead of N individual deletes
+- Atomic operation with progress reporting
+- Dry-run preview without making changes
+
 **Recommended schedule:**
 - Weekly: `mc cleanup --days 30` (keep last month)
 - Monthly: `mc cleanup --days 90` (aggressive cleanup)

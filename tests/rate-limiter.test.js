@@ -417,5 +417,199 @@ describe('Rate Limiter Module', () => {
 
       expect(securityLimit.max).toBeLessThan(statusLimit.max);
     });
+
+    test('exports RATE_LIMIT_FILE constant', () => {
+      expect(rateLimiter.RATE_LIMIT_FILE).toBeDefined();
+      expect(typeof rateLimiter.RATE_LIMIT_FILE).toBe('string');
+    });
+
+    test('exports SECURE_FILE_MODE constant', () => {
+      expect(rateLimiter.SECURE_FILE_MODE).toBeDefined();
+      expect(typeof rateLimiter.SECURE_FILE_MODE).toBe('number');
+      expect(rateLimiter.SECURE_FILE_MODE).toBe(0o600);
+    });
+  });
+
+  // ===========================================================================
+  // State Validation Tests (Security Hardening)
+  // ===========================================================================
+  describe('isValidRateLimitState', () => {
+    test('returns true for valid state', () => {
+      const validState = {
+        'test-cmd': [Date.now(), Date.now() - 1000],
+        'another-cmd': [Date.now()],
+      };
+      expect(rateLimiter.isValidRateLimitState(validState)).toBe(true);
+    });
+
+    test('returns false for null state', () => {
+      expect(rateLimiter.isValidRateLimitState(null)).toBe(false);
+    });
+
+    test('returns false for undefined state', () => {
+      expect(rateLimiter.isValidRateLimitState(undefined)).toBe(false);
+    });
+
+    test('returns false for array state', () => {
+      expect(rateLimiter.isValidRateLimitState([1, 2, 3])).toBe(false);
+    });
+
+    test('returns false for string state', () => {
+      expect(rateLimiter.isValidRateLimitState('invalid')).toBe(false);
+    });
+
+    test('returns false for state with non-array entries', () => {
+      const invalidState = {
+        'test-cmd': 'not-an-array',
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with invalid timestamp entries', () => {
+      const invalidState = {
+        'test-cmd': [Date.now(), 'not-a-number'],
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with negative timestamp entries', () => {
+      const invalidState = {
+        'test-cmd': [Date.now(), -1000],
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with Infinity timestamp entries', () => {
+      const invalidState = {
+        'test-cmd': [Date.now(), Infinity],
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with command name exceeding max length', () => {
+      const invalidState = {
+        ['a'.repeat(101)]: [Date.now()],
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with empty command name', () => {
+      const invalidState = {
+        '': [Date.now()],
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns true for empty object state', () => {
+      expect(rateLimiter.isValidRateLimitState({})).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Log Sanitization Tests (Security Hardening)
+  // ===========================================================================
+  describe('Log Sanitization', () => {
+    let consoleWarnSpy;
+
+    beforeEach(() => {
+      consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    });
+
+    afterEach(() => {
+      consoleWarnSpy.mockRestore();
+    });
+
+    test('sanitizes error messages in loadRateLimitState', async () => {
+      // Create a corrupted JSON file
+      const tempDir = path.join(os.tmpdir(), 'mc-test-' + Date.now());
+      const tempFile = path.join(tempDir, 'rate-limits.json');
+      
+      await fs.ensureDir(tempDir);
+      await fs.writeFile(tempFile, 'not valid json', { mode: 0o600 });
+
+      // Temporarily override the file path by mocking readJson to fail
+      const originalPath = rateLimiter.RATE_LIMIT_FILE;
+      jest.spyOn(fs, 'readJson').mockRejectedValueOnce(new Error('Log injection\n[new fake log entry]'));
+
+      await rateLimiter.loadRateLimitState();
+
+      // Verify the logged error was sanitized (newlines escaped)
+      expect(consoleWarnSpy).toHaveBeenCalled();
+      const loggedMessage = consoleWarnSpy.mock.calls[0][0];
+      expect(loggedMessage).not.toContain('\n[new fake log entry]');
+      expect(loggedMessage).toContain('\\n');
+
+      // Cleanup
+      fs.readJson.mockRestore();
+      await fs.remove(tempDir);
+    });
+
+    test('detects and logs prototype pollution attempts', async () => {
+      const { logSecurityViolation } = require('../lib/audit');
+      
+      // Mock fs.pathExists to return true
+      jest.spyOn(fs, 'pathExists').mockResolvedValueOnce(true);
+      
+      // Mock readJson to return a polluted object
+      const pollutedState = JSON.parse('{ "__proto__": { "polluted": true }, "validCmd": [123] }');
+      jest.spyOn(fs, 'readJson').mockResolvedValueOnce(pollutedState);
+
+      await rateLimiter.loadRateLimitState();
+
+      // Verify security violation was logged
+      expect(logSecurityViolation).toHaveBeenCalledWith(
+        'RATE_LIMIT_STATE_CORRUPTION',
+        expect.objectContaining({
+          reason: 'Prototype pollution detected in rate limit state',
+        })
+      );
+
+      // Cleanup
+      fs.pathExists.mockRestore();
+      fs.readJson.mockRestore();
+    });
+  });
+
+  // ===========================================================================
+  // File Permission Verification Tests (Security Hardening)
+  // ===========================================================================
+  describe('saveRateLimitState Permission Verification', () => {
+    test('returns true when permissions are set correctly', async () => {
+      // Reset state first
+      await rateLimiter.resetRateLimits('test-perm-ok', true);
+
+      // Save should succeed with correct permissions
+      const result = await rateLimiter.saveRateLimitState({
+        'test-perm-ok': [Date.now()],
+      });
+
+      expect(result).toBe(true);
+    });
+
+    test('returns false and logs when permissions do not match', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const { logSecurityViolation } = require('../lib/audit');
+
+      // Create a file with wrong permissions
+      const tempDir = path.join(os.tmpdir(), 'mc-test-perm-' + Date.now());
+      const tempFile = path.join(tempDir, 'rate-limits.json');
+      
+      await fs.ensureDir(tempDir);
+      await fs.writeFile(tempFile, '{}', { mode: 0o644 }); // Wrong permissions
+
+      // Mock the RATE_LIMIT_FILE temporarily
+      const originalModule = require('../lib/rate-limiter');
+      jest.spyOn(path, 'join').mockReturnValueOnce(tempDir).mockReturnValueOnce(tempFile);
+
+      // Try to save (permissions won't match)
+      process.env.MC_VERBOSE = '1';
+      const result = await rateLimiter.saveRateLimitState({ 'test': [123] });
+      delete process.env.MC_VERBOSE;
+
+      // Cleanup mocks and files
+      path.join.mockRestore();
+      await fs.remove(tempDir);
+      consoleWarnSpy.mockRestore();
+    });
   });
 });
