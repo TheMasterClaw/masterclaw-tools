@@ -44,6 +44,7 @@ const ssl = require('../lib/ssl');
 const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = require('../lib/exec');
 const { runDoctor } = require('../lib/doctor');
 const benchmark = require('../lib/benchmark');
+const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -53,7 +54,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.16.1')
+  .version('0.17.0')  // Added smoke-test feature
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -178,6 +179,40 @@ program
   .action(wrapCommand(async (options) => {
     await benchmark.exportResults(options.format, options.output);
   }, 'benchmark-export'));
+
+// =============================================================================
+// Smoke Test Commands - Post-Deployment Verification
+// =============================================================================
+
+program
+  .command('smoke-test')
+  .description('Run post-deployment smoke tests to verify API functionality')
+  .option('--api-url <url>', 'API base URL (auto-detected if not provided)')
+  .option('--quick', 'run quick test (critical endpoints only)')
+  .option('-j, --json', 'output results as JSON')
+  .action(wrapCommand(async (options) => {
+    if (options.quick) {
+      const result = await runQuickSmokeTest({ apiUrl: options.apiUrl });
+      
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      }
+      
+      if (!result.success) {
+        process.exit(ExitCode.SERVICE_UNAVAILABLE);
+      }
+    } else {
+      const result = await runSmokeTests({ apiUrl: options.apiUrl });
+      
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      }
+      
+      if (!result.success) {
+        process.exit(result.critical ? ExitCode.SERVICE_UNAVAILABLE : ExitCode.GENERAL_ERROR);
+      }
+    }
+  }, 'smoke-test'));
 
 // =============================================================================
 // Info Command

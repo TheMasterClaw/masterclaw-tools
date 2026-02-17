@@ -1,6 +1,6 @@
 {
   "name": "masterclaw-tools",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "description": "CLI utilities for MasterClaw - command your AI familiar from the terminal",
   "main": "bin/mc.js",
   "bin": {
@@ -19,7 +19,8 @@
     "deployment",
     "blue-green",
     "dependencies",
-    "benchmark"
+    "benchmark",
+    "smoke-test"
   ],
   "author": "Rex deus",
   "license": "MIT",
@@ -33,7 +34,8 @@
     "ora": "^5.4.1",
     "inquirer": "^8.2.6",
     "node-fetch": "^2.7.0",
-    "fs-extra": "^11.2.0"
+    "fs-extra": "^11.2.0",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

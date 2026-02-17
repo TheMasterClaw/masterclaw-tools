@@ -409,6 +409,67 @@ mc validate --fix-suggestions  # Show remediation steps for common issues
 - `0` — Validation passed, ready for deployment
 - `1` — Validation failed, fix issues before deploying
 
+### `mc smoke-test` 🆕
+Post-deployment API smoke tests — verify that your deployment actually works by testing all critical endpoints
+
+```bash
+mc smoke-test                  # Run full smoke test suite
+mc smoke-test --quick          # Run quick test (critical endpoints only)
+mc smoke-test --api-url http://localhost:8000  # Specify API URL
+mc smoke-test --json           # Output results as JSON
+```
+
+**Tests:**
+| Category | Endpoints | Purpose |
+|----------|-----------|---------|
+| Health | `/health`, `/health/security`, `/metrics` | Service availability |
+| API | `/v1/chat`, `/v1/memory/search`, `/v1/sessions` | Core functionality |
+| Analytics | `/v1/costs`, `/v1/analytics/stats` | Cost tracking |
+| Realtime | WebSocket connectivity | Streaming functionality |
+
+**Example Output:**
+```
+🧪 MasterClaw API Smoke Tests
+   Base URL: http://localhost:8000
+
+  ✅ Health Endpoint (45ms)
+  ✅ Metrics Endpoint (32ms)
+  ✅ Security Health Check (28ms)
+  ✅ Chat Endpoint (1245ms)
+  ✅ Memory Search (156ms)
+  ✅ Session List (89ms)
+  ✅ Cost Summary (67ms)
+  ✅ Analytics Stats (45ms)
+  ✅ WebSocket Connectivity (23ms)
+
+📊 Test Results
+   Duration: 1730ms
+   9 passed, 0 failed
+
+Category Breakdown:
+  ✅ health: 3/3
+  ✅ monitoring: 1/1
+  ✅ api: 4/4
+  ✅ realtime: 1/1
+
+✅ All smoke tests passed! Deployment is healthy.
+```
+
+**Exit codes:**
+- `0` — All tests passed, deployment is healthy
+- `1` — Some tests failed (non-critical)
+- `2` — Critical tests failed (deployment may be unhealthy)
+
+**Integration:**
+```bash
+# Run automatically after deployment
+make prod-smoke    # Deploy and run smoke tests
+make smoke-test    # Run smoke tests on existing deployment
+
+# In CI/CD pipeline
+mc smoke-test --api-url https://api.example.com --json
+```
+
 ### `mc env` 🆕
 Environment configuration management — compare, validate, and sync environment configurations between dev/staging/prod
 
