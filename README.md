@@ -169,6 +169,45 @@ mc status || exit 4      # Exit with service unavailable code
 
 ## Commands
 
+### `mc info` 🆕
+Show comprehensive system information — versions, paths, features, and configuration summary.
+
+```bash
+mc info              # Pretty-printed system overview
+mc info --json       # Machine-readable JSON output
+```
+
+**Displays:**
+- CLI version, Node.js version, and platform info
+- Core API version and status (if running)
+- System information (OS, memory, uptime)
+- Docker version and availability
+- Infrastructure directory location and key files
+- Configuration summary (keys configured)
+- Feature availability (monitoring, SSL, backups, canary deployment)
+
+**Example Output:**
+```
+🐾 MasterClaw System Information
+
+CLI:
+  Version: 0.14.0
+  Node.js: v22.22.0
+  Platform: linux (x64)
+
+Core API:
+  Status: ● Running
+  Version: 1.0.0
+
+System:
+  Hostname: ip-172-31-90-162
+  OS: linux 6.14.0-1018-aws (x64)
+  CPUs: 2
+  Memory: 3.2 GB free / 7.5 GB total
+  Uptime: 2d 5h 30m
+...
+```
+
 ### `mc validate`
 Pre-flight environment validation before deployment
 ```bash
