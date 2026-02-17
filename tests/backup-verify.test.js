@@ -109,6 +109,12 @@ describe('Backup Verify Module', () => {
 
     test('rejects paths with path traversal', () => {
       const { containsPathTraversal } = require('../lib/security');
+      // Store the default mock behavior manually
+      const defaultBehavior = (p) => {
+        if (typeof p !== 'string') return false;
+        return p.includes('../') || p.includes('..\\') || p.startsWith('..');
+      };
+      // Override for this test
       containsPathTraversal.mockReturnValue(true);
 
       const traversalPaths = [
@@ -123,6 +129,9 @@ describe('Backup Verify Module', () => {
         expect(result.securityViolation).toBe(true);
         expect(result.error).toContain('path traversal');
       }
+      
+      // Restore default behavior
+      containsPathTraversal.mockImplementation(defaultBehavior);
     });
 
     test('rejects paths with null bytes', () => {
@@ -134,12 +143,18 @@ describe('Backup Verify Module', () => {
 
     test('sanitizes filename component', () => {
       const { sanitizeFilename } = require('../lib/security');
+      // Store the default mock behavior manually
+      const defaultBehavior = (f) => f.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Override for this test
       sanitizeFilename.mockReturnValue('safe_backup.tar.gz');
 
       // Use a path without special traversal characters but with other unsafe chars
       const result = validateBackupFilePath('/path/to/my backup file.tar.gz');
       expect(result.valid).toBe(true);
       expect(sanitizeFilename).toHaveBeenCalled();
+      
+      // Restore default behavior
+      sanitizeFilename.mockImplementation(defaultBehavior);
     });
 
     test('accepts various backup extensions', () => {
@@ -190,12 +205,21 @@ describe('Backup Verify Module', () => {
 
     test('rejects invalid file paths in options', () => {
       const { containsPathTraversal } = require('../lib/security');
+      // Store the default mock behavior manually
+      const defaultBehavior = (p) => {
+        if (typeof p !== 'string') return false;
+        return p.includes('../') || p.includes('..\\') || p.startsWith('..');
+      };
+      // Override for this test
       containsPathTraversal.mockReturnValue(true);
 
       const options = { file: '../../../etc/passwd' };
       const result = validateVerifyOptions(options);
       expect(result.valid).toBe(false);
       expect(result.securityViolation).toBe(true);
+      
+      // Restore default behavior
+      containsPathTraversal.mockImplementation(defaultBehavior);
     });
   });
 
@@ -484,6 +508,11 @@ describe('Backup Verify Module', () => {
 
     test('prevents path traversal attacks', async () => {
       const { containsPathTraversal } = require('../lib/security');
+      // Store the default mock behavior manually
+      const defaultBehavior = (p) => {
+        if (typeof p !== 'string') return false;
+        return p.includes('../') || p.includes('..\\') || p.startsWith('..');
+      };
       
       const traversalAttempts = [
         '../../../etc/passwd',
@@ -500,6 +529,9 @@ describe('Backup Verify Module', () => {
           expect(result.securityViolation || result.error).toBeDefined();
         }
       }
+      
+      // Restore default behavior
+      containsPathTraversal.mockImplementation(defaultBehavior);
     });
 
     test('validates all option combinations', () => {
@@ -537,10 +569,19 @@ describe('Backup Verify Module', () => {
 
     test('invalid file path errors include security flag', () => {
       const { containsPathTraversal } = require('../lib/security');
+      // Store the default mock behavior manually
+      const defaultBehavior = (p) => {
+        if (typeof p !== 'string') return false;
+        return p.includes('../') || p.includes('..\\') || p.startsWith('..');
+      };
+      // Override for this test
       containsPathTraversal.mockReturnValue(true);
 
       const result = validateBackupFilePath('../../../etc/passwd');
       expect(result.securityViolation).toBe(true);
+      
+      // Restore default behavior
+      containsPathTraversal.mockImplementation(defaultBehavior);
     });
 
     test('verification failure includes exit code', async () => {
