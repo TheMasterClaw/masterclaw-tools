@@ -717,11 +717,60 @@ mc restore run --dry-run       # Preview what would be restored
 - Environment configuration (saved as `.env.restored` for review)
 
 ### `mc config`
-Manage configuration
+Manage CLI configuration — view, modify, export, and import settings
+
 ```bash
-mc config get gateway.url
-mc config set gateway.url https://your-gateway.com
-mc config list
+# View configuration
+mc config list                           # List all config values (masked)
+mc config list --json                    # Output as JSON
+mc config list --no-mask                 # Show sensitive values (use with caution)
+
+# Get/set individual values
+mc config get gateway.url                # Get a specific value
+mc config set gateway.url https://gw.example.com
+mc config set defaults.backupRetention 14
+mc config set defaults.autoUpdate false --json  # Parse value as JSON
+
+# Export/import configuration
+mc config export                         # Export to timestamped file
+mc config export ./backup-config.json    # Export to specific file
+mc config export --no-mask               # Export with sensitive values (caution!)
+mc config import ./backup-config.json    # Import from file (interactive)
+mc config import ./config.json --force   # Import without confirmation
+mc config import ./config.json --dry-run # Preview changes
+
+# Reset configuration
+mc config reset                          # Reset to defaults (with confirmation)
+mc config reset --force                  # Skip confirmation
+```
+
+**Features:**
+- **Dot notation** — Use keys like `gateway.url` for nested values
+- **Type inference** — Automatically converts booleans, numbers, null
+- **Security masking** — Sensitive values (tokens, passwords) are masked by default
+- **Safe export** — Exports mask sensitive values; use `--no-mask` only when necessary
+- **Import preview** — Shows diff before applying changes
+- **Rate limiting** — Set and import operations are rate-limited for security
+
+**Configuration Schema:**
+```json
+{
+  "infraDir": "/path/to/infrastructure",
+  "gateway": {
+    "url": "http://localhost:3000",
+    "token": null
+  },
+  "api": {
+    "url": "http://localhost:3001"
+  },
+  "core": {
+    "url": "http://localhost:8000"
+  },
+  "defaults": {
+    "backupRetention": 7,
+    "autoUpdate": true
+  }
+}
 ```
 
 ### `mc import`
