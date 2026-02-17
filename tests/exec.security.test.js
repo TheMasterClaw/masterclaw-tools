@@ -563,6 +563,10 @@ describe('Integration Security Tests', () => {
         code: 'BLOCKED_COMMAND' 
       },
       { 
+        fn: () => validateCommand(['sh', '-c', 'rm -rf /']), 
+        code: 'BLOCKED_SUBCOMMAND' 
+      },
+      { 
         fn: () => validateCommand(['ls', 'file;rm -rf /']), 
         code: 'COMMAND_INJECTION_ATTEMPT' 
       },
@@ -580,6 +584,161 @@ describe('Integration Security Tests', () => {
         expect(err.code).toBe(test.code);
       }
     }
+  });
+});
+
+// =============================================================================
+// Shell Command Injection Prevention Tests (NEW in v0.16.1)
+// =============================================================================
+
+describe('validateShellCommand', () => {
+  const { validateShellCommand, SHELL_INTERPRETERS, SHELL_COMMAND_OPTIONS } = require('../lib/exec');
+
+  test('allows non-shell commands with regular validation', () => {
+    expect(() => validateShellCommand(['ls', '-la'])).not.toThrow();
+    expect(() => validateShellCommand(['cat', '/etc/passwd'])).not.toThrow();
+    expect(() => validateShellCommand(['python', 'script.py'])).not.toThrow();
+  });
+
+  test('blocks dangerous characters in non-shell commands', () => {
+    expect(() => validateShellCommand(['ls', 'file;rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['echo', 'hello && rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['cat', 'file|sh'])).toThrow(DockerSecurityError);
+  });
+
+  test('allows shell without command option', () => {
+    expect(() => validateShellCommand(['sh'])).not.toThrow();
+    expect(() => validateShellCommand(['bash'])).not.toThrow();
+    expect(() => validateShellCommand(['bash', '-e', 'script.sh'])).not.toThrow();
+  });
+
+  test('validates shell -c option commands', () => {
+    // Safe commands
+    expect(() => validateShellCommand(['sh', '-c', 'echo hello'])).not.toThrow();
+    expect(() => validateShellCommand(['bash', '-c', 'ls -la'])).not.toThrow();
+    expect(() => validateShellCommand(['sh', '--command', 'cat file'])).not.toThrow();
+  });
+
+  test('blocks blocked subcommands in shell -c', () => {
+    expect(() => validateShellCommand(['sh', '-c', 'rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'dd if=/dev/zero of=/dev/sda'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['sh', '-c', 'mkfs.ext4 /dev/sda1'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'fdisk /dev/sda'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks command chaining in shell -c', () => {
+    expect(() => validateShellCommand(['sh', '-c', 'echo hello; rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'echo hello && rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['sh', '-c', 'echo hello || rm -rf /'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'echo hello | rm -rf /'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks command substitution in shell -c', () => {
+    expect(() => validateShellCommand(['sh', '-c', 'echo $(rm -rf /)'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'echo `rm -rf /`'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['sh', '-c', 'echo ${VAR}'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks path traversal in shell -c', () => {
+    expect(() => validateShellCommand(['sh', '-c', 'cat ../../etc/passwd'])).toThrow(DockerSecurityError);
+    expect(() => validateShellCommand(['bash', '-c', 'ls ~/..'])).toThrow(DockerSecurityError);
+  });
+
+  test('handles inline -c option format', () => {
+    expect(() => validateShellCommand(['sh', "-cecho hello"])).not.toThrow();
+    expect(() => validateShellCommand(['sh', "-crm -rf /"])).toThrow(DockerSecurityError);
+  });
+
+  test('validates multiple shell command options', () => {
+    // Multiple -c options (unusual but should validate each)
+    expect(() => validateShellCommand(['bash', '-c', 'echo 1', '-c', 'echo 2'])).not.toThrow();
+    expect(() => validateShellCommand(['bash', '-c', 'echo 1', '-c', 'rm -rf /'])).toThrow(DockerSecurityError);
+  });
+});
+
+describe('validateShellCommandString', () => {
+  const { validateShellCommandString } = require('../lib/exec');
+
+  test('allows safe shell command strings', () => {
+    expect(() => validateShellCommandString('echo hello')).not.toThrow();
+    expect(() => validateShellCommandString('ls -la /app')).not.toThrow();
+    expect(() => validateShellCommandString('cat /etc/passwd')).not.toThrow();
+    expect(() => validateShellCommandString('python manage.py migrate')).not.toThrow();
+  });
+
+  test('blocks blocked subcommands', () => {
+    expect(() => validateShellCommandString('rm file')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('rm')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('dd if=/dev/zero of=/dev/sda')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('mkfs -t ext4 /dev/sda')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('mkfs.ext4 /dev/sda')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('fdisk -l')).toThrow(DockerSecurityError);
+  });
+
+  test('blocks command chaining operators', () => {
+    expect(() => validateShellCommandString('cmd1; cmd2')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('cmd1 && cmd2')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('cmd1 || cmd2')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('cmd1 | cmd2')).toThrow(DockerSecurityError);
+  });
+
+  test('blocks command substitution', () => {
+    expect(() => validateShellCommandString('echo $(whoami)')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('echo `whoami`')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('echo ${USER}')).toThrow(DockerSecurityError);
+  });
+
+  test('blocks path traversal patterns', () => {
+    expect(() => validateShellCommandString('cat ../file')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('ls ../../etc')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('cat ~/secret')).toThrow(DockerSecurityError);
+  });
+
+  test('handles edge cases', () => {
+    expect(() => validateShellCommandString('')).not.toThrow();
+    expect(() => validateShellCommandString(null)).not.toThrow();
+    expect(() => validateShellCommandString(undefined)).not.toThrow();
+  });
+
+  test('is case insensitive for blocked commands', () => {
+    expect(() => validateShellCommandString('RM file')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('Rm -rf /')).toThrow(DockerSecurityError);
+    expect(() => validateShellCommandString('MKFS.EXT4 /dev/sda')).toThrow(DockerSecurityError);
+  });
+});
+
+describe('checkDangerousCharacters', () => {
+  const { checkDangerousCharacters } = require('../lib/exec');
+
+  test('allows safe commands', () => {
+    expect(() => checkDangerousCharacters(['ls', '-la'])).not.toThrow();
+    expect(() => checkDangerousCharacters(['echo', 'hello world'])).not.toThrow();
+    expect(() => checkDangerousCharacters(['cat', 'file.txt'])).not.toThrow();
+  });
+
+  test('blocks semicolons', () => {
+    expect(() => checkDangerousCharacters(['echo', 'hello; rm -rf /'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks ampersands', () => {
+    expect(() => checkDangerousCharacters(['echo', 'hello && rm -rf /'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks pipes', () => {
+    expect(() => checkDangerousCharacters(['echo', 'hello | cat'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks backticks', () => {
+    expect(() => checkDangerousCharacters(['echo', '`rm -rf /`'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks dollar parentheses', () => {
+    expect(() => checkDangerousCharacters(['echo', '$(rm -rf /)'])).toThrow(DockerSecurityError);
+  });
+
+  test('blocks redirection', () => {
+    expect(() => checkDangerousCharacters(['echo', 'hello > file'])).toThrow(DockerSecurityError);
+    expect(() => checkDangerousCharacters(['cat', '< file'])).toThrow(DockerSecurityError);
   });
 });
 
@@ -619,6 +778,34 @@ describe('Security Constants', () => {
     for (const cmd of minimumBlocked) {
       expect(BLOCKED_COMMANDS.has(cmd)).toBe(true);
     }
+  });
+
+  test('SHELL_INTERPRETERS contains common shells', () => {
+    const { SHELL_INTERPRETERS } = require('../lib/exec');
+    expect(SHELL_INTERPRETERS.has('sh')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('bash')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('ash')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('zsh')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('dash')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('ksh')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('csh')).toBe(true);
+    expect(SHELL_INTERPRETERS.has('tcsh')).toBe(true);
+  });
+
+  test('SHELL_COMMAND_OPTIONS contains -c and --command', () => {
+    const { SHELL_COMMAND_OPTIONS } = require('../lib/exec');
+    expect(SHELL_COMMAND_OPTIONS.has('-c')).toBe(true);
+    expect(SHELL_COMMAND_OPTIONS.has('--command')).toBe(true);
+  });
+
+  test('BLOCKED_COMMANDS includes filesystem utilities', () => {
+    const { BLOCKED_COMMANDS } = require('../lib/exec');
+    // Extended filesystem utilities added in v0.16.1
+    expect(BLOCKED_COMMANDS.has('mkfs.ext4')).toBe(true);
+    expect(BLOCKED_COMMANDS.has('mkfs.ext3')).toBe(true);
+    expect(BLOCKED_COMMANDS.has('mkfs.xfs')).toBe(true);
+    expect(BLOCKED_COMMANDS.has('mkswap')).toBe(true);
+    expect(BLOCKED_COMMANDS.has('parted')).toBe(true);
   });
 });
 

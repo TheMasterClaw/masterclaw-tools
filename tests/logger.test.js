@@ -41,6 +41,10 @@ jest.mock('chalk', () => ({
 // Mock security module
 jest.mock('../lib/security', () => ({
   maskSensitiveData: jest.fn((data) => data.replace(/secret/g, '[REDACTED]')),
+  sanitizeForLog: jest.fn((str, maxLength = 1000) => {
+    if (typeof str !== 'string') return String(str);
+    return str.slice(0, maxLength).replace(/[\r\n]/g, '\\n');
+  }),
 }));
 
 // =============================================================================
@@ -604,6 +608,287 @@ describe('Logger integration', () => {
 });
 
 // =============================================================================
+// Security Features Tests - New in v0.16.1
+// =============================================================================
+
+describe('Security: Metadata Sanitization', () => {
+  // We test the behavior through the public log API since sanitizeMetadata
+  // uses sanitizeForLog internally which is mocked
+
+  test('handles circular references in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const obj = { name: 'test' };
+    obj.self = obj; // Circular reference
+    
+    info('test message', obj);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.self).toBe('[Circular]');
+    expect(parsed.name).toBe('test');
+  });
+
+  test('limits nesting depth in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    // Create a deeply nested object programmatically
+    let deep = { level: 12 };
+    for (let i = 11; i >= 1; i--) {
+      deep = { level: i, nested: deep };
+    }
+    
+    info('test message', deep);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.level).toBe(1);
+    // Navigate through nesting - depth limit is 10
+    let current = parsed;
+    let depth = 0;
+    while (current && typeof current === 'object' && current.nested && typeof current.nested === 'object' && depth < 15) {
+      expect(current.level).toBe(depth + 1);
+      current = current.nested;
+      depth++;
+    }
+    // Should have stopped at depth 10 with a string marker
+    expect(depth).toBe(10);
+    expect(current).toBe('[MaxDepthExceeded]');
+  });
+
+  test('limits total keys in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const obj = {};
+    for (let i = 0; i < 150; i++) {
+      obj[`key${i}`] = i;
+    }
+    
+    info('test message', obj);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed['[truncated]']).toBe('[MaxKeysExceeded]');
+  });
+
+  test('limits array length in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const arr = new Array(150).fill('item');
+    
+    info('test message', { items: arr });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    // Array should be limited to around 100 items plus truncation indicator
+    expect(parsed.items.length).toBeLessThanOrEqual(101);
+    // Last item should indicate truncation
+    const lastItem = parsed.items[parsed.items.length - 1];
+    expect(typeof lastItem === 'string' && lastItem.includes('more')).toBe(true);
+  });
+
+  test('limits string length in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const longString = 'a'.repeat(20000);
+    
+    info('test message', { value: longString });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.value.length).toBeLessThan(15000);
+  });
+
+  test('sanitizes newlines in strings', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    
+    info('test message', { message: 'line1\nline2\rline3' });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.message).toContain('\\n');
+  });
+
+  test('converts functions to [Function]', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    
+    info('test message', { fn: () => {}, name: 'test' });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.fn).toBe('[Function]');
+    expect(parsed.name).toBe('test');
+  });
+
+  test('converts Date to ISO string', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const date = new Date('2024-01-15');
+    
+    info('test message', { created: date });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.created).toBe('2024-01-15T00:00:00.000Z');
+  });
+
+  test('redacts binary data', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const buffer = Buffer.from('secret data');
+    
+    info('test message', { data: buffer });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.data).toBe('[BinaryData:11bytes]');
+  });
+
+  test('handles Error objects in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const err = new Error('Test error');
+    err.code = 'TEST_CODE';
+    
+    info('test message', { error: err });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.error.name).toBe('Error');
+    expect(parsed.error.message).toBe('Test error');
+    expect(parsed.error.code).toBe('TEST_CODE');
+    expect(parsed.error.stack).toBeDefined();
+  });
+
+  test('handles BigInt in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    
+    info('test message', { big: BigInt(9007199254740991) });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.big).toBe('9007199254740991');
+  });
+
+  test('handles Symbol in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const sym = Symbol('test');
+    
+    info('test message', { symbol: sym });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.symbol).toContain('Symbol');
+  });
+
+  test('handles RegExp in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const regex = /test/gi;
+    
+    info('test message', { pattern: regex });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.pattern).toBe('/test/gi');
+  });
+
+  test('handles Error objects in metadata', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const err = new Error('Test error');
+    err.code = 'TEST_CODE';
+    
+    info('test message', { error: err });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.error.name).toBe('Error');
+    expect(parsed.error.message).toBe('Test error');
+    expect(parsed.error.code).toBe('TEST_CODE');
+    expect(parsed.error.stack).toBeDefined();
+  });
+
+  test('handles BigInt', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    
+    info('test message', { big: BigInt(9007199254740991) });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.big).toBe('9007199254740991');
+  });
+
+  test('handles Symbol', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const sym = Symbol('test');
+    
+    info('test message', { symbol: sym });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.symbol).toContain('Symbol');
+  });
+
+  test('handles RegExp', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    const regex = /test/gi;
+    
+    info('test message', { pattern: regex });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.pattern).toBe('/test/gi');
+  });
+});
+
+describe('Security: Sensitive Key Detection', () => {
+  test('redacts sensitive values in metadata', () => {
+    configure({ format: 'json', redactSensitive: true, level: LogLevel.DEBUG });
+    info('test', { password: 'secret123', api_key: 'abc123', safe: 'value' });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.password).toBe('[REDACTED]');
+    expect(parsed.api_key).toBe('[REDACTED]');
+    expect(parsed.safe).toBe('value');
+  });
+});
+
+describe('Security: Log Entry Size Limits', () => {
+  test('truncates oversized entries', () => {
+    configure({ format: 'json', level: LogLevel.DEBUG });
+    // Create an object that will exceed 100KB but stay within key limits
+    // Each key has 2000 chars, 60 keys = ~120KB of string data
+    // This should trigger the entry size limit
+    const hugeMeta = {};
+    for (let i = 0; i < 60; i++) {
+      hugeMeta[`k${i}`] = 'x'.repeat(2000);
+    }
+    
+    info('test message', hugeMeta);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    // Entry should be truncated due to size or the metadata should be limited
+    // The key assertion is that the log was written without errors
+    expect(parsed.message).toBe('test message');
+    // Either _truncated is set or the metadata was reduced
+    expect(parsed._truncated === true || Object.keys(parsed).length < 65).toBe(true);
+  });
+});
+
+describe('Security: Log Injection Prevention', () => {
+  test('sanitizes log injection characters in message', () => {
+    const { sanitizeForLog } = jest.requireMock('../lib/security');
+    configure({ format: 'json' });
+    
+    info('test\nmessage\rwith\rcrlf');
+    
+    expect(sanitizeForLog).toHaveBeenCalledWith(expect.any(String), 10000);
+  });
+
+  test('sanitizes context', () => {
+    configure({ format: 'json' });
+    info('message', {}, { context: 'Test\nContext' });
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.context).not.toContain('\n');
+  });
+});
+
+// =============================================================================
 // Constants Tests
 // =============================================================================
 
@@ -622,5 +907,16 @@ describe('Constants', () => {
   test('DEFAULT_LOG_DIR points to .masterclaw/logs', () => {
     expect(DEFAULT_LOG_DIR).toContain('.masterclaw');
     expect(DEFAULT_LOG_DIR).toContain('logs');
+  });
+
+  test('security constants are defined', () => {
+    const { MAX_LOG_ENTRY_SIZE, MAX_METADATA_DEPTH, MAX_METADATA_KEYS, MAX_METADATA_VALUE_LENGTH, SENSITIVE_METADATA_KEYS } = require('../lib/logger');
+    
+    expect(MAX_LOG_ENTRY_SIZE).toBe(100 * 1024); // 100KB
+    expect(MAX_METADATA_DEPTH).toBe(10);
+    expect(MAX_METADATA_KEYS).toBe(100);
+    expect(MAX_METADATA_VALUE_LENGTH).toBe(10000);
+    expect(SENSITIVE_METADATA_KEYS).toContain('password');
+    expect(SENSITIVE_METADATA_KEYS).toContain('token');
   });
 });

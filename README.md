@@ -996,7 +996,7 @@ npm test -- --coverage
 
 ### exec.security.test.js — Container Execution Security
 
-The newest test suite validates the security controls for `mc exec` and `mc containers` commands:
+The test suite validates the security controls for `mc exec` and `mc containers` commands:
 
 **Container Validation:**
 - ✅ Only allowed containers can be targeted (`mc-core`, `mc-backend`, etc.)
@@ -1008,6 +1008,34 @@ The newest test suite validates the security controls for `mc exec` and `mc cont
 - ✅ Shell injection characters are detected and blocked
 - ✅ Command length limits prevent DoS attacks
 - ✅ Environment variable name validation
+
+**Shell Command Injection Prevention (v0.16.1) 🆕**
+- ✅ Detects and blocks shell escapes via `-c` / `--command` options
+- ✅ Validates command strings passed to shell interpreters (`sh`, `bash`, `zsh`, etc.)
+- ✅ Blocks command chaining (`;`, `&&`, `||`, `|`)
+- ✅ Blocks command substitution (`$(...)`, `` `...` ``)
+- ✅ Blocks dangerous subcommands within shell strings
+- ✅ Prevents path traversal via tilde expansion (`~/..`)
+- ✅ Comprehensive blocked command list includes filesystem utilities (`mkfs.*`, `mkswap`, etc.)
+
+**Example blocked attacks:**
+```bash
+# Blocked: dangerous command in shell string
+mc exec mc-core sh -c "rm -rf /"        # ❌ BLOCKED
+mc exec mc-core bash -c "dd if=/dev/zero of=/dev/sda"  # ❌ BLOCKED
+
+# Blocked: command chaining attempts
+mc exec mc-core sh -c "echo test; rm -rf /"            # ❌ BLOCKED
+mc exec mc-core bash -c "echo test && mkfs.ext4 /dev/sda"  # ❌ BLOCKED
+
+# Blocked: command substitution
+mc exec mc-core sh -c 'echo $(rm -rf /)'               # ❌ BLOCKED
+mc exec mc-core bash -c "echo \`fdisk -l\`"            # ❌ BLOCKED
+
+# Allowed: safe shell commands
+mc exec mc-core sh -c "echo hello"                     # ✅ OK
+mc exec mc-core bash -c "ls -la /app"                  # ✅ OK
+```
 
 **Integration Security:**
 - ✅ Prevents command injection through container names

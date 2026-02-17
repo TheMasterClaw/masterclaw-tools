@@ -53,7 +53,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.15.0')
+  .version('0.16.1')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
