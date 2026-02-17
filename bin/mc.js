@@ -29,6 +29,7 @@ const cleanup = require('../lib/cleanup');
 const completion = require('../lib/completion');
 const importer = require('../lib/import');
 const deps = require('../lib/deps');
+const cost = require('../lib/cost');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
@@ -109,6 +110,7 @@ program.addCommand(cleanup);
 program.addCommand(completion);
 program.addCommand(importer);
 program.addCommand(deps);
+program.addCommand(cost);
 program.addCommand(ssl);
 
 // =============================================================================
