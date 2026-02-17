@@ -295,6 +295,86 @@ mc notify test discord
 mc notify start
 ```
 
+### `mc events` 🆕
+Event tracking and notification history — track system events, acknowledge alerts, and maintain an audit trail of important activities.
+
+```bash
+# List and filter events
+mc events list                      # List recent events
+mc events list -u                   # Show only unacknowledged events
+mc events list --severity critical  # Show critical events only
+mc events list --type backup        # Show backup events
+mc events list --since 24h          # Events from last 24 hours
+mc events list --search "deploy"    # Search events
+mc events list --compact            # Compact output format
+
+# View and acknowledge events
+mc events show <id>                 # Show event details
+mc events ack <id>                  # Acknowledge an event
+mc events ack-all                   # Acknowledge all events
+mc events ack-all --severity high   # Acknowledge high severity only
+
+# Event statistics
+mc events stats                     # Show event statistics
+mc events stats --since 7d          # Stats for last 7 days
+
+# Add custom events
+mc events add "Custom note" --type info
+mc events add "Deployment started" --type deploy --severity info
+
+# Export and manage events
+mc events export                    # Export events to JSON
+mc events export --format csv       # Export as CSV
+mc events clear --older-than 30d    # Clear old events
+
+# Real-time monitoring
+mc events watch                     # Watch for new events
+mc events watch --severity high     # Watch for high severity+ events
+```
+
+**Event Types:**
+| Type | Icon | Description |
+|------|------|-------------|
+| `backup` | 💾 | Backup operations |
+| `deploy` | 🚀 | Deployments and rollbacks |
+| `alert` | 🔔 | System alerts |
+| `error` | ❌ | Errors and failures |
+| `warning` | ⚠️ | Warnings |
+| `info` | ℹ️ | Informational events |
+| `security` | 🔒 | Security-related events |
+| `maintenance` | 🔧 | Maintenance activities |
+| `restore` | 📦 | Restore operations |
+| `update` | ⬆️ | Updates |
+
+**Severity Levels:**
+- `critical` — Immediate attention required
+- `high` — Should be addressed soon
+- `medium` — Normal operational events
+- `low` — Minor issues
+- `info` — Informational only
+
+**Example Workflow:**
+```bash
+# Check for unacknowledged critical events
+mc events list -u --severity critical
+
+# Acknowledge a specific event
+mc events ack evt_1234567890
+
+# Add a note about manual intervention
+mc events add "Investigated disk alert - false positive" --type info
+
+# Export events for compliance reporting
+mc events export --since 30d -o monthly-report.json
+```
+
+**Integration with other commands:**
+Events are automatically created by:
+- `mc backup` — Creates backup events
+- `mc deploy` — Creates deployment events
+- `mc restore` — Creates restore events
+- `mc health` — Creates health check events (on failures)
+
 **Displays:**
 - CLI version, Node.js version, and platform info
 - Core API version and status (if running)
@@ -1118,6 +1198,7 @@ The CLI uses these modules:
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support
 - `lib/notify.js` - **NEW: Notification channel management**
+- `lib/events.js` - **NEW: Event tracking and notification history**
 - `lib/security.js` - Centralized security utilities
 - `lib/exec.js` - Container execution (mc exec, mc containers)
 - `lib/rate-limiter.js` - Command rate limiting

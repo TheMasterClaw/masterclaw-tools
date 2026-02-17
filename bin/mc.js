@@ -35,6 +35,7 @@ const backupVerify = require('../lib/backup-verify');
 const update = require('../lib/update');
 const info = require('../lib/info');
 const notify = require('../lib/notify');
+const { events } = require('../lib/events');
 const { validate, printResults, getRemediationSteps } = require('../lib/validate');
 const { wrapCommand, setupGlobalErrorHandlers, ExitCode } = require('../lib/error-handler');
 const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
@@ -56,7 +57,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.19.0')  // Added config command module
+  .version('0.20.0')  // Added events command for event tracking
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -126,6 +127,7 @@ program.addCommand(ssl);
 program.addCommand(backupVerify);
 program.addCommand(update);
 program.addCommand(notify);
+program.addCommand(events);
 program.addCommand(env.program);
 program.addCommand(maintenance);
 program.addCommand(configCmd);
