@@ -196,6 +196,38 @@ mc validate || exit 9    # Exit with validation code on failure
 mc status || exit 4      # Exit with service unavailable code
 ```
 
+### JSON Output Mode 🆕
+For production environments and CI/CD pipelines that require structured log aggregation, enable JSON output mode:
+
+```bash
+MC_JSON_OUTPUT=1 mc status          # Output errors as structured JSON
+MC_JSON_OUTPUT=1 mc validate        # JSON output for automation
+```
+
+**Example JSON output:**
+```json
+{
+  "level": "error",
+  "timestamp": "2024-02-17T19:30:00.000Z",
+  "category": "docker",
+  "exitCode": 3,
+  "message": "Docker is not installed",
+  "suggestion": "Install Docker from https://docs.docker.com/get-docker/",
+  "command": "status",
+  "error": {
+    "type": "Error",
+    "message": "Docker daemon connection refused",
+    "code": "ECONNREFUSED"
+  }
+}
+```
+
+**Benefits:**
+- Structured logging for ELK, Splunk, or cloud log aggregation
+- Machine-readable error details for automation
+- Consistent schema across all error types
+- Sensitive data automatically masked
+
 ## Commands
 
 ### `mc info` 🆕

@@ -9,6 +9,7 @@ const {
   getUserMessage,
   getSuggestion,
   displayError,
+  isJsonOutputMode,
   ExitCode,
   ErrorCategory,
   ERROR_MESSAGE_MAP,
@@ -446,6 +447,142 @@ describe('Error Handler Integration', () => {
     const result = await wrapped({});
     
     expect(result).toEqual({ success: true, data: 'test' });
+  });
+});
+
+// =============================================================================
+// JSON Output Mode Tests
+// =============================================================================
+
+describe('JSON Output Mode', () => {
+  let consoleErrorSpy;
+  
+  afterEach(() => {
+    delete process.env.MC_JSON_OUTPUT;
+    if (consoleErrorSpy) {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+  
+  describe('isJsonOutputMode', () => {
+    test('returns false by default', () => {
+      expect(isJsonOutputMode()).toBe(false);
+    });
+    
+    test('returns true when MC_JSON_OUTPUT=1', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      expect(isJsonOutputMode()).toBe(true);
+    });
+    
+    test('returns true when MC_JSON_OUTPUT=true', () => {
+      process.env.MC_JSON_OUTPUT = 'true';
+      expect(isJsonOutputMode()).toBe(true);
+    });
+    
+    test('returns false when MC_JSON_OUTPUT is other value', () => {
+      process.env.MC_JSON_OUTPUT = 'yes';
+      expect(isJsonOutputMode()).toBe(false);
+    });
+  });
+  
+  describe('displayError with JSON mode', () => {
+    beforeEach(() => {
+      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+      delete process.env.MC_JSON_OUTPUT;
+    });
+    
+    test('outputs JSON when MC_JSON_OUTPUT is set', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      const err = new Error('Docker not installed');
+      err.code = 'ENOENT';
+      
+      displayError(err, { command: 'status' });
+      
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const output = consoleErrorSpy.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      
+      expect(parsed).toHaveProperty('timestamp');
+      expect(parsed).toHaveProperty('category');
+      expect(parsed).toHaveProperty('exitCode');
+      expect(parsed).toHaveProperty('message');
+      expect(parsed).toHaveProperty('error');
+      expect(parsed.error).toHaveProperty('type');
+      expect(parsed.error).toHaveProperty('message');
+    });
+    
+    test('includes suggestion in JSON output when available', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      // Use a Docker error that has a suggestion
+      const err = new Error('docker: command not found');
+      
+      displayError(err, { command: 'status' });
+      
+      const output = consoleErrorSpy.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      
+      expect(parsed).toHaveProperty('suggestion');
+    });
+    
+    test('includes verbose details when verbose is true', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      const err = new Error('Test error');
+      err.stack = 'Error: Test error\n    at Test.method';
+      
+      displayError(err, { verbose: true, command: 'test' });
+      
+      const output = consoleErrorSpy.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      
+      expect(parsed).toHaveProperty('verbose');
+      expect(parsed.verbose).toHaveProperty('stack');
+    });
+    
+    test('masks sensitive data in JSON output', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      const err = new Error('api_key=sk-test1234567890abcdef failed');
+      
+      displayError(err, { verbose: true });
+      
+      const output = consoleErrorSpy.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      
+      // The API key should be masked
+      expect(parsed.error.message).not.toContain('sk-test1234567890abcdef');
+      expect(parsed.error.message).toContain('[REDACTED]');
+    });
+    
+    test('omits undefined values from JSON output', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      const err = new Error('Test error');
+      
+      displayError(err, {});  // No command specified
+      
+      const output = consoleErrorSpy.mock.calls[0][0];
+      const parsed = JSON.parse(output);
+      
+      // command should not be in output since it was undefined
+      expect(parsed).not.toHaveProperty('command');
+    });
+    
+    test('returns correct exit code in JSON mode', () => {
+      process.env.MC_JSON_OUTPUT = '1';
+      
+      const err = new Error('ECONNREFUSED');
+      
+      const exitCode = displayError(err, {});
+      
+      expect(exitCode).toBe(ExitCode.NETWORK_ERROR);
+    });
   });
 });
 
