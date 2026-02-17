@@ -62,6 +62,35 @@ Config operations are protected against prototype pollution attacks:
 - **Safe deep merge** — Config merging prevents prototype chain pollution
 - **Set operation validation** — Nested key paths are validated before assignment
 
+### Import Security 🛡️
+
+The `mc import` command includes comprehensive security protections:
+
+**Path Traversal Protection:**
+- Blocks `../../../etc/passwd` style attacks
+- Prevents access to files outside intended directories
+- Validates all path components before file access
+
+**File Validation:**
+- **Size limits** — Maximum 10MB import files prevent DoS
+- **Extension whitelist** — Only `.json` files allowed
+- **Content validation** — File structure verified before processing
+
+**Prototype Pollution Prevention:**
+- Detects and rejects `__proto__`, `constructor`, `prototype` keys
+- Sanitizes nested objects recursively
+- Prevents malicious object pollution attacks
+
+**Rate Limiting:**
+- 10 imports per minute maximum
+- Prevents automated abuse and resource exhaustion
+- Integrated with `mc rate-limit` command
+
+**Audit Logging:**
+- Security violations logged for review
+- Failed import attempts tracked
+- Path traversal attempts recorded with details
+
 ### Security Commands
 ```bash
 mc config-audit    # Audit config file permissions
@@ -516,6 +545,15 @@ mc import validate <file>      # Validate import file without importing
 - Automatic format detection with manual override (`--type`)
 - Validation of import file structure before importing
 - Progress reporting with error details
+
+**Security Features:**
+- **Path Traversal Protection** — Blocks `../../../etc/passwd` style attacks
+- **File Size Limits** — Maximum 10MB import files (DoS protection)
+- **Extension Validation** — Only `.json` files allowed
+- **Prototype Pollution Prevention** — Rejects `__proto__`, `constructor`, `prototype` keys
+- **Rate Limiting** — 10 imports per minute (prevents abuse)
+- **Item Limits** — Maximum 10,000 memories per import
+- **Audit Logging** — Security violations are logged for review
 
 **Examples:**
 ```bash
