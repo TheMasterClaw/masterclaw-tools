@@ -8,11 +8,14 @@ const {
   validateComposeArgs,
   validateWorkingDirectory,
   validateTailOption,
+  validateTimeout,
   DockerSecurityError,
   DockerCommandError,
   MAX_CONTAINER_NAME_LENGTH,
   MAX_TAIL_LINES,
   ALLOWED_COMPOSE_COMMANDS,
+  DEFAULT_DOCKER_TIMEOUT_MS,
+  QUICK_DOCKER_TIMEOUT_MS,
 } = require('../lib/docker');
 
 // =============================================================================
@@ -375,6 +378,92 @@ describe('Security Integration Tests', () => {
         expect(err.code).toBe(test.code);
       }
     }
+  });
+});
+
+// =============================================================================
+// Timeout Option Validation Tests
+// =============================================================================
+
+describe('validateTimeout', () => {
+  test('accepts valid timeout values', () => {
+    expect(() => validateTimeout(0)).not.toThrow();
+    expect(() => validateTimeout(1)).not.toThrow();
+    expect(() => validateTimeout(1000)).not.toThrow();
+    expect(() => validateTimeout(60000)).not.toThrow();
+    expect(() => validateTimeout(3600000)).not.toThrow(); // 1 hour (max)
+  });
+
+  test('accepts undefined and null', () => {
+    expect(() => validateTimeout(undefined)).not.toThrow();
+    expect(() => validateTimeout(null)).not.toThrow();
+  });
+
+  test('rejects negative values', () => {
+    expect(() => validateTimeout(-1)).toThrow(DockerSecurityError);
+    expect(() => validateTimeout(-100)).toThrow(DockerSecurityError);
+  });
+
+  test('rejects values exceeding maximum (1 hour)', () => {
+    expect(() => validateTimeout(3600001)).toThrow(DockerSecurityError);
+    expect(() => validateTimeout(7200000)).toThrow(DockerSecurityError); // 2 hours
+  });
+
+  test('rejects non-integer values', () => {
+    expect(() => validateTimeout(1.5)).toThrow(DockerSecurityError);
+    expect(() => validateTimeout(1000.5)).toThrow(DockerSecurityError);
+  });
+
+  test('rejects non-number values', () => {
+    expect(() => validateTimeout('1000')).toThrow(DockerSecurityError);
+    expect(() => validateTimeout({})).toThrow(DockerSecurityError);
+    expect(() => validateTimeout([])).toThrow(DockerSecurityError);
+  });
+
+  test('error includes correct error codes', () => {
+    // Test NEGATIVE_TIMEOUT code
+    try {
+      validateTimeout(-1);
+    } catch (err) {
+      expect(err.code).toBe('NEGATIVE_TIMEOUT');
+    }
+
+    // Test TIMEOUT_TOO_LARGE code
+    try {
+      validateTimeout(7200000);
+    } catch (err) {
+      expect(err.code).toBe('TIMEOUT_TOO_LARGE');
+      expect(err.details.requested).toBe(7200000);
+      expect(err.details.max).toBe(3600000);
+    }
+
+    // Test INVALID_TIMEOUT_TYPE code for non-number
+    try {
+      validateTimeout('1000');
+    } catch (err) {
+      expect(err.code).toBe('INVALID_TIMEOUT_TYPE');
+    }
+
+    // Test INVALID_TIMEOUT_TYPE code for non-integer
+    try {
+      validateTimeout(1.5);
+    } catch (err) {
+      expect(err.code).toBe('INVALID_TIMEOUT_TYPE');
+    }
+  });
+});
+
+// =============================================================================
+// Timeout Constants Tests
+// =============================================================================
+
+describe('Timeout Constants', () => {
+  test('DEFAULT_DOCKER_TIMEOUT_MS is 5 minutes', () => {
+    expect(DEFAULT_DOCKER_TIMEOUT_MS).toBe(5 * 60 * 1000);
+  });
+
+  test('QUICK_DOCKER_TIMEOUT_MS is 30 seconds', () => {
+    expect(QUICK_DOCKER_TIMEOUT_MS).toBe(30 * 1000);
   });
 });
 
