@@ -264,6 +264,30 @@ Trigger manual backup
 mc backup
 ```
 
+### `mc backup-verify`
+Verify backup integrity and restorability — ensures backups can actually be restored
+```bash
+mc backup-verify                 # Verify latest backup (default)
+mc backup-verify --latest        # Same as above
+mc backup-verify --all           # Verify all backups within retention
+mc backup-verify --file <path>   # Verify specific backup file
+mc backup-verify --metrics       # Output Prometheus metrics format
+mc backup-verify --quiet         # Exit code only, no output
+```
+
+**Why verify backups?**
+- Detects corrupted archives before you need them
+- Tests that backups can actually be restored
+- Validates backup contents and structure
+- Provides Prometheus metrics for monitoring
+
+**Verification checks:**
+- Archive integrity (corruption detection)
+- Manifest file presence
+- Data archive readability
+- Test restore of sample files
+- Age warnings for stale backups
+
 ### `mc restore`
 Disaster recovery - restore from backups with interactive selection
 ```bash
