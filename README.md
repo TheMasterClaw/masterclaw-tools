@@ -681,6 +681,57 @@ const configHealth = await securityMonitor.monitorConfiguration();
 - **Configuration Drift**: File permission and hash-based change detection
 - **Automated Response**: High-severity threats automatically logged to audit trail
 
+## Testing 🧪
+
+MasterClaw Tools includes comprehensive test coverage with 400+ tests:
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test suite
+npm test -- docker.security.test.js
+npm test -- exec.security.test.js
+npm test -- error-handler.test.js
+
+# Run with coverage
+npm test -- --coverage
+```
+
+### Security Test Suites
+
+| Test File | Coverage |
+|-----------|----------|
+| `docker.security.test.js` | Docker command validation, container security |
+| `exec.security.test.js` | **Container execution security** — `mc exec` command hardening |
+| `config.security.test.js` | Config file permissions, prototype pollution protection |
+| `services.security.test.js` | Service health check security |
+| `audit.integrity.test.js` | Audit log signing and tamper detection |
+| `security-monitor.test.js` | Threat detection algorithms |
+| `rate-limiter.test.js` | Command rate limiting |
+| `error-handler.test.js` | Error classification and safe error messages |
+
+### exec.security.test.js — Container Execution Security
+
+The newest test suite validates the security controls for `mc exec` and `mc containers` commands:
+
+**Container Validation:**
+- ✅ Only allowed containers can be targeted (`mc-core`, `mc-backend`, etc.)
+- ✅ Path traversal attempts in container names are blocked
+- ✅ Container must be running before execution
+
+**Command Security:**
+- ✅ Blocked commands are rejected (`rm`, `dd`, `mkfs`, `fdisk`, etc.)
+- ✅ Shell injection characters are detected and blocked
+- ✅ Command length limits prevent DoS attacks
+- ✅ Environment variable name validation
+
+**Integration Security:**
+- ✅ Prevents command injection through container names
+- ✅ Prevents command injection through arguments
+- ✅ Path traversal protection in working directories
+- ✅ All security errors include proper error codes for debugging
+
 ## Related
 
 - [masterclaw-infrastructure](https://github.com/TheMasterClaw/masterclaw-infrastructure) — Deployment
