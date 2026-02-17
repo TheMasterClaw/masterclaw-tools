@@ -38,6 +38,7 @@ const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
 const securityMonitor = require('../lib/security-monitor');
 const rateLimiter = require('../lib/rate-limiter');
 const ssl = require('../lib/ssl');
+const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = require('../lib/exec');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -47,7 +48,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.12.0')
+  .version('0.13.0')
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -499,7 +500,7 @@ program
     console.log(chalk.cyan('Command Rate Limits (sliding window):\n'));
 
     // Group commands by sensitivity
-    const highSecurity = ['config-audit', 'config-fix', 'audit-verify', 'security', 'restore'];
+    const highSecurity = ['config-audit', 'config-fix', 'audit-verify', 'security', 'exec', 'restore'];
     const deployment = ['deploy', 'revive'];
     const dataMod = ['cleanup', 'import'];
     const readOnly = ['status', 'health', 'logs', 'validate'];
@@ -648,6 +649,124 @@ program
       process.exit(ExitCode.SECURITY_VIOLATION);
     }
   }, 'security'));
+
+// =============================================================================
+// Container Execution Commands
+// =============================================================================
+
+program
+  .command('exec')
+  .description('Execute a command in a running MasterClaw container')
+  .argument('<container>', 'Container name (mc-core, mc-backend, mc-gateway, mc-chroma)')
+  .argument('<command>', 'Command to execute (use quotes for multi-word commands)')
+  .option('-i, --interactive', 'Run in interactive mode (keep STDIN open)', false)
+  .option('-t, --tty', 'Allocate a pseudo-TTY (for colored output)', false)
+  .option('-w, --workdir <dir>', 'Working directory inside the container')
+  .option('-e, --env <vars...>', 'Environment variables (KEY=value format)')
+  .option('--shell', 'Open a shell in the container (shortcut for -it with sh)')
+  .action(wrapCommand(async (container, commandArg, options) => {
+    // Enforce rate limiting for exec command (security-sensitive)
+    await rateLimiter.enforceRateLimit('exec', { command: 'exec', container });
+
+    // Handle shell shortcut
+    if (options.shell) {
+      options.interactive = true;
+      options.tty = true;
+    }
+
+    // Parse environment variables
+    const env = {};
+    if (options.env) {
+      for (const envVar of options.env) {
+        const [key, ...valueParts] = envVar.split('=');
+        if (key && valueParts.length > 0) {
+          env[key] = valueParts.join('=');
+        }
+      }
+    }
+
+    // Parse command (split by space unless already an array)
+    const command = commandArg.split(' ').filter(Boolean);
+
+    if (!options.interactive) {
+      console.log(chalk.blue(`🐾 Executing in ${container}:`));
+      console.log(chalk.gray(`   ${command.join(' ')}\n`));
+    }
+
+    try {
+      const result = await execInContainer({
+        container,
+        command,
+        interactive: options.interactive,
+        tty: options.tty,
+        workdir: options.workdir,
+        env,
+      });
+
+      if (options.interactive) {
+        // Interactive mode: just show exit code
+        console.log('');
+        if (result.exitCode === 0) {
+          console.log(chalk.green(`✅ Shell exited successfully`));
+        } else {
+          console.log(chalk.yellow(`⚠️  Shell exited with code ${result.exitCode}`));
+        }
+      } else {
+        // Non-interactive mode: show output
+        if (result.stdout) {
+          console.log(result.stdout);
+        }
+        if (result.stderr) {
+          console.error(chalk.yellow(result.stderr));
+        }
+        
+        if (result.exitCode === 0) {
+          console.log(chalk.gray(`\n✅ Completed in ${result.duration}ms`));
+        } else {
+          console.log(chalk.yellow(`\n⚠️  Exit code: ${result.exitCode} (${result.duration}ms)`));
+          process.exit(result.exitCode);
+        }
+      }
+    } catch (error) {
+      if (error.code === 'CONTAINER_NOT_RUNNING') {
+        console.log(chalk.red(`❌ Container '${container}' is not running`));
+        console.log(chalk.gray('   Run "mc status" to check service status'));
+        console.log(chalk.gray('   Run "mc revive" to start services'));
+      } else if (error.code === 'BLOCKED_COMMAND') {
+        console.log(chalk.red(`❌ Command blocked for security: ${error.details?.command}`));
+      } else {
+        console.log(chalk.red(`❌ ${error.message}`));
+      }
+      throw error;
+    }
+  }, 'exec'));
+
+// List containers subcommand
+program
+  .command('containers')
+  .description('List running MasterClaw containers')
+  .option('-a, --all', 'Show all containers including stopped', false)
+  .action(wrapCommand(async (options) => {
+    console.log(chalk.blue('🐾 MasterClaw Containers\n'));
+    
+    const containers = await getRunningContainers();
+    
+    if (containers.length === 0) {
+      console.log(chalk.yellow('No MasterClaw containers are running'));
+      console.log(chalk.gray('   Run "mc revive" to start services'));
+      return;
+    }
+
+    console.log(chalk.cyan('Running Containers:'));
+    for (const c of containers) {
+      console.log(`  ${chalk.green('●')} ${chalk.bold(c.name)}`);
+      console.log(chalk.gray(`     Status: ${c.uptime}`));
+    }
+    
+    console.log('');
+    console.log(chalk.gray(`Use 'mc exec <container> <command>' to run commands`));
+    console.log(chalk.gray(`Use 'mc exec <container> sh --shell' for interactive shell`));
+  }, 'containers'));
 
 // =============================================================================
 // Parse and Execute

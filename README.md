@@ -38,7 +38,7 @@ mc rate-limit --status     # Same as above
 **Rate limits by command category:**
 | Category | Commands | Limit | Window |
 |----------|----------|-------|--------|
-| 🔒 High Security | `config-audit`, `config-fix`, `audit-verify`, `security`, `restore` | 3-10 | 1-5 min |
+| 🔒 High Security | `config-audit`, `config-fix`, `audit-verify`, `security`, `exec`, `restore` | 3-10 | 1-5 min |
 | 🚀 Deployment | `deploy`, `revive` | 5-10 | 1-5 min |
 | 💾 Data Modification | `cleanup`, `import` | 5-10 | 1 min |
 | 📖 Read-Only | `status`, `health`, `logs`, `validate` | 30-60 | 1 min |
@@ -229,6 +229,73 @@ mc deploy history              # Show deployment history
 
 ### `mc logs`
 Comprehensive log management and viewing
+
+### `mc exec` 🆕
+Execute commands in running MasterClaw containers — like `kubectl exec` or `docker exec` but tailored for MasterClaw
+
+```bash
+# Execute a command in a container
+mc exec mc-core "python --version"           # Check Python version in core
+mc exec mc-backend "node --version"          # Check Node version in backend
+mc exec mc-chroma "ls -la /chroma/chroma"    # List files in ChromaDB
+
+# Interactive shell (full terminal access)
+mc exec mc-core sh --shell                   # Open shell in core container
+mc exec mc-backend bash --shell              # Open bash shell (if available)
+
+# With working directory
+mc exec mc-core "ls -la" -w /data            # List files in /data directory
+
+# With environment variables
+mc exec mc-core "echo \$MY_VAR" -e MY_VAR=hello
+
+# Interactive mode with TTY (for colored output)
+mc exec mc-core "htop" -i -t                 # Run htop interactively
+```
+
+**Security Features:**
+- Container whitelist — only MasterClaw containers can be targeted
+- Command injection prevention — dangerous characters blocked
+- Blocked commands — `rm`, `dd`, `mkfs`, `fdisk`, and other dangerous commands are blocked
+- Rate limiting — 10 executions per minute (high-security command)
+- Audit logging — all executions logged for security review
+- Timeout protection — commands timeout after 5 minutes (30 min for interactive)
+
+**Allowed Containers:**
+- `mc-core` — AI brain (Python environment)
+- `mc-backend` — API backend (Node.js environment)
+- `mc-gateway` — OpenClaw gateway
+- `mc-chroma` — Vector database
+- `mc-interface` — Frontend (nginx)
+- `mc-traefik` — Reverse proxy
+
+**Exit Codes:**
+- Container exit code is passed through
+- Non-zero exit codes indicate command failure
+
+### `mc containers` 🆕
+List running MasterClaw containers
+
+```bash
+mc containers              # Show running containers
+mc containers -a           # Show all containers (including stopped)
+```
+
+**Example Output:**
+```
+🐾 MasterClaw Containers
+
+Running Containers:
+  ● mc-core
+     Status: Up 3 hours
+  ● mc-backend
+     Status: Up 3 hours
+  ● mc-gateway
+     Status: Up 3 hours
+
+Use 'mc exec <container> <command>' to run commands
+Use 'mc exec <container> sh --shell' for interactive shell
+```
 ```bash
 mc logs [service]              # View logs (service: traefik, interface, backend, core, gateway, chroma, watchtower, all)
 mc logs backend --follow       # Follow logs in real-time
@@ -541,6 +608,8 @@ The CLI uses these modules:
 - `lib/task.js` - Task management
 - `lib/completion.js` - Shell auto-completion support
 - `lib/security.js` - Centralized security utilities
+- `lib/exec.js` - Container execution (mc exec, mc containers)
+- `lib/rate-limiter.js` - Command rate limiting
 
 ### Security Module (`lib/security.js`)
 
