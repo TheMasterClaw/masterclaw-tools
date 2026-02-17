@@ -20,6 +20,43 @@ npx .
 
 MasterClaw Tools implements comprehensive security hardening:
 
+### Distributed Tracing & Correlation IDs 🔗
+
+MasterClaw CLI automatically generates correlation IDs for distributed tracing:
+
+```bash
+# Correlation IDs are automatically included in all logs
+# Set custom correlation ID via environment variable (CI/CD integration)
+MC_CORRELATION_ID=deploy-2024-001 mc deploy
+
+# Correlation IDs propagate through:
+# - Logger output (as context)
+# - Audit log entries  
+# - System events
+# - HTTP headers (x-correlation-id)
+```
+
+**Features:**
+- **Automatic generation** — Unique IDs for each command execution (`mc_<timestamp>_<random>`)
+- **Environment integration** — Pass `MC_CORRELATION_ID` for CI/CD pipeline tracing
+- **Hierarchical tracing** — Child IDs for sub-operations (`parent.child`)
+- **Security validated** — IDs sanitized to prevent log injection (max 64 chars, alphanumeric + `_-`)
+- **HTTP propagation** — Automatic `x-correlation-id` header for API calls
+
+**Usage in code:**
+```javascript
+const { 
+  generateCorrelationId,
+  runWithCorrelationIdAsync,
+  getCurrentCorrelationId 
+} = require('./lib/correlation');
+
+// Run with correlation context
+await runWithCorrelationIdAsync(async () => {
+  console.log(getCurrentCorrelationId()); // mc_abc123...
+}, 'my-custom-id');
+```
+
 ### Input Validation
 - **Service names** — Validated against whitelist before use
 - **Container names** — Sanitized to prevent command injection
