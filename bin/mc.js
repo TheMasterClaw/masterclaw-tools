@@ -407,21 +407,63 @@ program
 program
   .command('chat <message>')
   .description('Send a quick message to MasterClaw')
-  .action(wrapCommand(async (message) => {
+  .option('--no-stream', 'disable streaming response (if supported)')
+  .action(wrapCommand(async (message, options) => {
+    // Security: Validate and sanitize input
+    const { validateChatInput, sanitizeChatInput } = require('../lib/chat-security');
+    
+    // Validate input before processing
+    const validation = validateChatInput(message);
+    if (!validation.valid) {
+      console.log(chalk.yellow(`⚠️  ${validation.error}`));
+      process.exit(ExitCode.INVALID_ARGUMENTS);
+    }
+    
+    // Sanitize input to prevent injection
+    const sanitizedMessage = sanitizeChatInput(message);
+    
+    // Rate limiting for chat command (10 per minute)
+    await rateLimiter.enforceRateLimit('chat', { command: 'chat', messageLength: sanitizedMessage.length });
+    
     console.log(chalk.blue('🐾 Sending message...\n'));
     
     const coreUrl = await config.get('core.url') || 'http://localhost:8000';
     const axios = require('axios');
     
-    const response = await axios.post(`${coreUrl}/v1/chat`, {
-      message,
-      session_id: `cli-${Date.now()}`,
-    }, {
-      timeout: 30000, // 30 second timeout
-    });
-    
-    console.log(chalk.cyan('MasterClaw:'));
-    console.log(response.data.response);
+    try {
+      const response = await axios.post(`${coreUrl}/v1/chat`, {
+        message: sanitizedMessage,
+        session_id: `cli-${Date.now()}`,
+      }, {
+        timeout: 60000, // 60 second timeout for AI responses
+        maxContentLength: 100 * 1024, // 100KB max response
+        maxBodyLength: 50 * 1024, // 50KB max request body
+      });
+      
+      // Validate response structure
+      if (!response.data || typeof response.data.response !== 'string') {
+        throw new Error('Invalid response from MasterClaw API');
+      }
+      
+      console.log(chalk.cyan('MasterClaw:'));
+      console.log(response.data.response);
+    } catch (err) {
+      if (err.response) {
+        // API returned an error response
+        const status = err.response.status;
+        if (status === 429) {
+          console.log(chalk.yellow('⚠️  Rate limited by MasterClaw API. Please wait before sending more messages.'));
+          process.exit(ExitCode.SECURITY_VIOLATION);
+        } else if (status >= 500) {
+          console.log(chalk.red(`❌ MasterClaw API error (${status}). The service may be overloaded.`));
+          process.exit(ExitCode.SERVICE_UNAVAILABLE);
+        } else {
+          console.log(chalk.red(`❌ API error: ${err.response.data?.detail || err.message}`));
+          process.exit(ExitCode.GENERAL_ERROR);
+        }
+      }
+      throw err; // Re-throw for default error handling
+    }
   }, 'chat'));
 
 // =============================================================================
