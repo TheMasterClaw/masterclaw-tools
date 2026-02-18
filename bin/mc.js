@@ -48,6 +48,7 @@ const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = req
 const { runDoctor } = require('../lib/doctor');
 const benchmark = require('../lib/benchmark');
 const depsValidator = require('../lib/deps-validator');
+const { envCmd } = require('../lib/env-manager');
 const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
 const maintenance = require('../lib/maintenance');
 const configCmd = require('../lib/config-cmd');
@@ -139,6 +140,7 @@ program.addCommand(notify);
 program.addCommand(contextCmd);
 program.addCommand(events);
 program.addCommand(env.program);
+program.addCommand(envCmd);
 program.addCommand(maintenance);
 program.addCommand(configCmd);
 program.addCommand(secretsCmd);
