@@ -59,6 +59,7 @@ const performance = require('../lib/performance');
 const { aliasCmd } = require('../lib/alias');
 const { metricsCmd } = require('../lib/metrics');
 const { topCmd } = require('../lib/top');
+const changelogCmd = require('../lib/changelog');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -68,7 +69,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.30.0')  // Feature: Added mc context sync command to sync rex-deus context to AI memory
+  .version('0.31.0')  // Feature: Added mc changelog command to view ecosystem changelogs
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -150,6 +151,7 @@ program.addCommand(secretsCmd);
 program.addCommand(aliasCmd);
 program.addCommand(metricsCmd);
 program.addCommand(topCmd);
+program.addCommand(changelogCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing

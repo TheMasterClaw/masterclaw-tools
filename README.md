@@ -1879,6 +1879,91 @@ mc status
 mc update --services && mc health --compact || echo "Update failed"
 ```
 
+### `mc changelog` 🆕
+View changelogs from across the MasterClaw ecosystem — see what's new, what changed, and track version history without leaving the terminal.
+
+```bash
+# View changelogs
+mc changelog                     # Show summary of all component changelogs
+mc changelog core                # Show full changelog for core
+mc changelog tools               # Show full changelog for tools
+mc changelog infrastructure      # Show full changelog for infrastructure
+mc changelog all                 # Same as 'mc changelog' (default)
+
+# Filter and search
+mc changelog --limit 10          # Show last 10 entries
+mc changelog --version 1.0.0     # Show specific version only
+mc changelog --since 2024-01-01  # Show entries since date
+mc changelog --json              # Output as JSON for scripting
+
+# View latest changes
+mc changelog latest              # Show latest changes from all components
+mc changelog latest -n 5         # Show 5 entries per component
+
+# Search changelogs
+mc changelog search "security"   # Search for "security" across all changelogs
+mc changelog search "API"        # Search for API-related changes
+```
+
+**Features:**
+- **Multi-component** — View changelogs from core, tools, and infrastructure
+- **Summary view** — Quick overview of recent changes across the ecosystem
+- **Version filtering** — Find changes for specific versions
+- **Full-text search** — Search for terms across all changelogs
+- **Colorized output** — Syntax highlighting for added/fixed/changed sections
+- **JSON output** — Scriptable output for automation
+
+**Example Output:**
+```
+🐾 MasterClaw Changelog Summary
+==============================
+
+📦 Core
+  1.2.0        (2024-02-15)
+  1.1.0        (2024-02-01)
+  1.0.0        (2024-01-15)
+
+📦 Tools
+  0.31.0       (2024-02-18)  ← 5 added | 2 fixed
+  0.30.0       (2024-02-16)
+  0.29.0       (2024-02-14)
+
+📦 Infrastructure
+  Unreleased   (2024-02-18)  ← 3 added | 1 fixed
+  1.1.0        (2024-02-10)
+```
+
+**Search Example:**
+```bash
+$ mc changelog search "security"
+
+🐾 Changelog Search: "security"
+================================
+
+Found 3 results:
+
+[core] 1.2.0
+  SECURITY: Fixed authentication bypass in webhook handler
+
+[tools] 0.31.0
+  Added security hardening to mc exec command
+
+[infrastructure] 1.1.0
+  SECURITY: Updated Traefik to patch CVE-2024-xxx
+```
+
+**Workflow:**
+```bash
+# After updating, see what's new
+mc update && mc changelog latest
+
+# Before deploying to production, check for breaking changes
+mc changelog search "BREAKING"
+
+# Get JSON output for CI/CD notifications
+mc changelog latest --json | jq '.core[0].version'
+```
+
 ### `mc completion`
 Shell auto-completion support for bash, zsh, and fish
 

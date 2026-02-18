@@ -1,0 +1,17 @@
+PASS tests/export.security.test.js
+PASS tests/circuit-breaker.test.js
+PASS tests/exec.security.test.js
+PASS tests/docker.security.test.js
+PASS tests/services.security.test.js
+PASS tests/config.security.test.js
+PASS tests/http-client.test.js
+PASS tests/import.security.test.js
+PASS tests/chat-security.test.js
+PASS tests/security.test.js
+
+Test Suites: 10 passed, 10 total
+Tests:       454 passed, 454 total
+Snapshots:   0 total
+Time:        1.538 s, estimated 2 s
+Ran all test suites matching /(http-client|circuit-breaker|security)\.test/i.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
