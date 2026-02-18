@@ -629,6 +629,62 @@ mc benchmark-export --format csv       # Export as CSV
 mc benchmark-export -o report.json     # Custom output file
 ```
 
+### `mc performance` 🆕
+View API endpoint performance metrics and profiling data from the Core API.
+Identify slow endpoints, track response times, and optimize API performance.
+
+```bash
+# Show performance summary (default)
+mc performance
+
+# Show detailed endpoint statistics
+mc performance --stats
+
+# Show top N slowest endpoints
+mc performance --slowest 10
+
+# Show recent request profiles
+mc performance --profiles 50
+
+# Show only slow requests
+mc performance --profiles --slow-only
+
+# Clear all performance profiles
+mc performance --clear
+```
+
+**Performance Metrics:**
+| Metric | Description |
+|--------|-------------|
+| Avg Response Time | Mean response time across all requests |
+| Min/Max Time | Fastest and slowest observed times |
+| Slow Requests | Count of requests exceeding threshold (default: 1000ms) |
+| Slow % | Percentage of requests that were slow |
+| Status Codes | Distribution of HTTP response codes |
+
+**Example Output:**
+```
+🐾 MasterClaw Performance Summary
+
+Total Requests: 1,247
+Average Response Time: 245.32ms
+Slow Requests: 23 (1.84%)
+Endpoints Tracked: 15
+Slow Threshold: 1000ms
+```
+
+**Use Cases:**
+- Identify endpoints needing optimization
+- Monitor API performance trends
+- Debug slow response times
+- Set performance SLAs and alerts
+
+**Configuration:**
+Environment variables (in Core):
+- `PERF_SLOW_THRESHOLD_MS` — Slow request threshold (default: 1000ms)
+- `PERF_MAX_PROFILES` — Maximum profiles to store (default: 10000)
+- `PERF_ENABLED` — Enable/disable profiling (default: true)
+
 ### `mc validate`
 Pre-flight environment validation before deployment
 ```bash
@@ -787,6 +843,68 @@ Checks performed:
 - Docker container status
 - SSL certificate expiration
 - Infrastructure health checks
+
+### `mc check` 🆕
+Pre-flight dependency validation — check that command dependencies are satisfied before execution with actionable remediation steps.
+
+```bash
+# Check dependencies for a specific command
+mc check status                # Check if 'mc status' can run
+mc check revive                # Check if 'mc revive' can run
+mc check deploy                # Check if 'mc deploy' can run
+
+# Check all common dependencies
+mc check --all                 # Check Docker, Compose, infrastructure, config, disk, memory
+
+# Check specific dependencies
+mc check -d docker             # Check Docker only
+mc check -d docker compose     # Check Docker and Docker Compose
+mc check -d infra config       # Check infrastructure directory and config
+
+# Quiet mode (exit code only, useful for scripts)
+mc check status --quiet        # Exit 0 if ready, non-zero if not
+```
+
+**Dependency Types:**
+| Type | Description | Severity |
+|------|-------------|----------|
+| `docker` | Docker daemon availability | Critical |
+| `compose` | Docker Compose availability | Critical |
+| `infra` | Infrastructure directory location | Critical |
+| `config` | Configuration file security | Warning |
+| `disk` | Available disk space | Warning |
+| `memory` | Available system memory | Warning |
+
+**Example Output:**
+```
+🔍 Checking dependencies for 'revive'
+
+✅ Docker is available and running
+✅ Docker Compose is available
+✅ Infrastructure directory found: /opt/masterclaw-infrastructure
+⚠️  Configuration has security issues
+   → Run: mc config-fix to fix permissions
+   → Review: mc config-audit for details
+
+Results: 3 passed, 1 failed
+
+⚠️  Critical dependencies satisfied - can proceed with caution
+```
+
+**Programmatic Usage:**
+```bash
+# In scripts: check before running
+if mc check deploy --quiet; then
+    mc deploy rolling
+else
+    echo "Cannot deploy - fix dependencies first"
+    exit 1
+fi
+```
+
+**Exit Codes:**
+- `0` — All critical dependencies satisfied, can proceed
+- `9` — Critical dependencies missing, cannot proceed
 
 ### `mc circuits` 🆕
 View and manage circuit breaker status for service resilience
@@ -1533,6 +1651,7 @@ The CLI uses these modules:
 - `lib/security.js` - Centralized security utilities
 - `lib/exec.js` - Container execution (mc exec, mc containers)
 - `lib/rate-limiter.js` - Command rate limiting
+- `lib/deps-validator.js` - **NEW: Command dependency validation with actionable remediation**
 
 ### Security Module (`lib/security.js`)
 

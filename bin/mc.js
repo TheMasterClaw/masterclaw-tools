@@ -46,12 +46,14 @@ const ssl = require('../lib/ssl');
 const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = require('../lib/exec');
 const { runDoctor } = require('../lib/doctor');
 const benchmark = require('../lib/benchmark');
+const depsValidator = require('../lib/deps-validator');
 const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
 const maintenance = require('../lib/maintenance');
 const configCmd = require('../lib/config-cmd');
 const { getAllCircuitStatus, resetAllCircuits, CircuitState } = require('../lib/circuit-breaker');
 const { secretsCmd } = require('../lib/secrets');
 const contextCmd = require('../lib/context');
+const performance = require('../lib/performance');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -61,7 +63,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.23.0')  // Added mc context command for rex-deus context management
+  .version('0.24.0')  // Added mc check command for dependency validation
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -407,6 +409,115 @@ program
       process.exit(ExitCode.GENERAL_ERROR);
     }
   }, 'doctor'));
+
+// Check command - dependency validation with actionable remediation
+program
+  .command('check')
+  .description('Check command dependencies before execution')
+  .argument('[command]', 'Command to check dependencies for (e.g., status, revive, deploy)')
+  .option('-a, --all', 'Check all common dependencies')
+  .option('-d, --deps <deps...>', 'Check specific dependencies (docker, compose, infra-dir, config)')
+  .option('-q, --quiet', 'Minimal output, exit code only')
+  .action(wrapCommand(async (commandName, options) => {
+    const { 
+      validateCommandDeps, 
+      validateCustomDeps, 
+      validateDocker, 
+      validateDockerCompose, 
+      validateInfraDir,
+      validateDiskSpace,
+      validateMemory,
+      DependencyType 
+    } = depsValidator;
+    
+    // Determine what to check
+    let results;
+    
+    if (options.all || (!commandName && !options.deps)) {
+      // Check all common dependencies
+      if (!options.quiet) {
+        console.log(chalk.blue('🔍 Checking MasterClaw Dependencies\n'));
+      }
+      
+      results = await validateCustomDeps([
+        DependencyType.DOCKER,
+        DependencyType.DOCKER_COMPOSE,
+        DependencyType.INFRA_DIR,
+        DependencyType.CONFIG,
+        DependencyType.DISK_SPACE,
+        DependencyType.MEMORY,
+      ]);
+    } else if (options.deps) {
+      // Check specific dependencies
+      const depMap = {
+        'docker': DependencyType.DOCKER,
+        'compose': DependencyType.DOCKER_COMPOSE,
+        'docker-compose': DependencyType.DOCKER_COMPOSE,
+        'infra': DependencyType.INFRA_DIR,
+        'infra-dir': DependencyType.INFRA_DIR,
+        'config': DependencyType.CONFIG,
+        'disk': DependencyType.DISK_SPACE,
+        'memory': DependencyType.MEMORY,
+      };
+      
+      const depsToCheck = options.deps.map(d => depMap[d]).filter(Boolean);
+      
+      if (!options.quiet) {
+        console.log(chalk.blue(`🔍 Checking dependencies: ${options.deps.join(', ')}\n`));
+      }
+      
+      results = await validateCustomDeps(depsToCheck);
+    } else if (commandName) {
+      // Check dependencies for a specific command
+      if (!options.quiet) {
+        console.log(chalk.blue(`🔍 Checking dependencies for '${commandName}'\n`));
+      }
+      
+      results = await validateCommandDeps(commandName);
+    }
+    
+    // Display results
+    if (!options.quiet) {
+      let passed = 0;
+      let failed = 0;
+      
+      for (const result of results.results) {
+        const icon = result.satisfied 
+          ? chalk.green('✅') 
+          : result.severity === 'critical' 
+            ? chalk.red('❌') 
+            : chalk.yellow('⚠️');
+        
+        console.log(`${icon} ${result.message}`);
+        
+        if (!result.satisfied && result.remediation) {
+          for (const step of result.remediation.slice(0, 3)) {
+            console.log(chalk.gray(`   → ${step}`));
+          }
+        }
+        
+        if (result.satisfied) {
+          passed++;
+        } else {
+          failed++;
+        }
+      }
+      
+      console.log('');
+      console.log(chalk.cyan(`Results: ${chalk.green(`${passed} passed`)}, ${failed > 0 ? chalk.red(`${failed} failed`) : chalk.green(`${failed} failed`)}`));
+      
+      if (results.canProceed) {
+        console.log(chalk.green('\n✅ All critical dependencies satisfied - ready to proceed!'));
+      } else {
+        console.log(chalk.red('\n❌ Critical dependencies missing - cannot proceed'));
+      }
+    }
+    
+    // Exit with appropriate code
+    if (!results.canProceed) {
+      process.exit(ExitCode.VALIDATION_FAILED);
+    }
+  }, 'check'));
 
 // =============================================================================
 // Communication Commands
@@ -1236,6 +1347,36 @@ program
     console.log(chalk.gray(`Use 'mc exec <container> <command>' to run commands`));
     console.log(chalk.gray(`Use 'mc exec <container> sh --shell' for interactive shell`));
   }, 'containers'));
+
+// =============================================================================
+// Performance Profiling Commands
+// =============================================================================
+
+program
+  .command('performance')
+  .description('View API performance metrics and profiling data')
+  .option('--summary', 'Show performance summary (default)')
+  .option('--stats', 'Show detailed endpoint statistics')
+  .option('--slowest [n]', 'Show top N slowest endpoints', parseInt)
+  .option('--profiles [n]', 'Show recent request profiles', parseInt)
+  .option('--slow-only', 'Only show slow requests (with --profiles)')
+  .option('--clear', 'Clear all performance profiles')
+  .action(wrapCommand(async (options) => {
+    if (options.clear) {
+      await performance.clearProfiles();
+    } else if (options.stats) {
+      await performance.showStats();
+    } else if (options.slowest) {
+      const n = typeof options.slowest === 'number' ? options.slowest : 10;
+      await performance.showSlowest(n);
+    } else if (options.profiles) {
+      const limit = typeof options.profiles === 'number' ? options.profiles : 20;
+      await performance.showProfiles({ limit, slowOnly: options.slowOnly });
+    } else {
+      // Default to summary
+      await performance.showSummary();
+    }
+  }, 'performance'));
 
 // =============================================================================
 // Parse and Execute
