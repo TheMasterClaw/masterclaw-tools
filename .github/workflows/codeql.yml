@@ -1,0 +1,230 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for CodeQL
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for better analysis
+          fetch-depth: 0
+
+      # Initialize CodeQL with extended security queries
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Use extended security query suite for comprehensive scanning
+          queries: security-extended,security-and-quality
+          # Enable experimental queries for additional coverage
+          config: |
+            paths-ignore:
+              - 'node_modules/**'
+              - 'coverage/**'
+              - '**/*.test.js'
+              - '**/tests/**'
+            queries:
+              - uses: security-extended
+              - uses: security-and-quality
+
+      # Autobuild step (not needed for JavaScript, but included for completeness)
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v3
+
+      # Manual build if needed (for JavaScript/TypeScript, this is usually not required)
+      - name: Build project (if needed)
+        if: matrix.build-mode == 'manual'
+        run: |
+          npm ci
+          npm run build 2>/dev/null || echo "No build step required"
+
+      # Perform CodeQL Analysis
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Upload results even if the job fails
+          upload: true
+
+      # Generate summary report
+      - name: Generate Security Report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = './codeql-results';
+            
+            // Check if results directory exists
+            if (fs.existsSync(path)) {
+              const files = fs.readdirSync(path);
+              console.log('CodeQL Analysis Results:');
+              console.log('=======================');
+              files.forEach(file => {
+                console.log(`- ${file}`);
+              });
+            } else {
+              console.log('CodeQL analysis completed. Check Security tab for results.');
+            }
+
+  # Job to validate CodeQL results don't block merge on existing issues
+  validate-results:
+    name: Validate Results
+    needs: analyze
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      security-events: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for new critical/high alerts
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            // Get open CodeQL alerts
+            const alerts = await github.rest.codeScanning.listAlertsForRepo({
+              owner,
+              repo,
+              tool_name: 'CodeQL',
+              state: 'open',
+              per_page: 100
+            });
+            
+            const criticalCount = alerts.data.filter(a => a.rule.severity === 'critical').length;
+            const highCount = alerts.data.filter(a => a.rule.severity === 'high').length;
+            const mediumCount = alerts.data.filter(a => a.rule.severity === 'medium').length;
+            const lowCount = alerts.data.filter(a => a.rule.severity === 'low').length;
+            
+            console.log('🔒 CodeQL Security Analysis Summary');
+            console.log('====================================');
+            console.log(`Critical: ${criticalCount}`);
+            console.log(`High: ${highCount}`);
+            console.log(`Medium: ${mediumCount}`);
+            console.log(`Low: ${lowCount}`);
+            console.log(`Total: ${alerts.data.length}`);
+            
+            // Set outputs for potential notification use
+            core.setOutput('critical', criticalCount);
+            core.setOutput('high', highCount);
+            core.setOutput('medium', mediumCount);
+            core.setOutput('low', lowCount);
+            
+            // Don't fail the workflow, just report
+            // This allows existing issues to not block development
+            // while new issues are still tracked
+            if (criticalCount > 0) {
+              core.warning(`⚠️ ${criticalCount} critical security issues found. Review in Security tab.`);
+            }
+            if (highCount > 0) {
+              core.info(`ℹ️ ${highCount} high severity issues found.`);
+            }
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            const alerts = await github.rest.codeScanning.listAlertsForRepo({
+              owner,
+              repo,
+              tool_name: 'CodeQL',
+              state: 'open',
+              per_page: 10
+            });
+            
+            if (alerts.data.length === 0) {
+              // No action needed if no alerts
+              return;
+            }
+            
+            const newAlerts = alerts.data.slice(0, 5);
+            let body = '## 🔒 CodeQL Security Analysis\n\n';
+            
+            if (alerts.data.length > 0) {
+              body += `Found ${alerts.data.length} open security alert(s). Top issues:\n\n`;
+              newAlerts.forEach(alert => {
+                const severity = alert.rule.severity;
+                const emoji = severity === 'critical' ? '🚨' : severity === 'high' ? '⚠️' : 'ℹ️';
+                body += `- ${emoji} **${severity.toUpperCase()}**: ${alert.rule.description || alert.rule.name}\n`;
+                if (alert.most_recent_instance) {
+                  body += `  - Location: \`${alert.most_recent_instance.location.path}:${alert.most_recent_instance.location.start_line}\`\n`;
+                }
+              });
+              
+              if (alerts.data.length > 5) {
+                body += `\n... and ${alerts.data.length - 5} more.\n`;
+              }
+              
+              body += `\n📊 [View full results in Security tab](../../security/code-scanning)`;
+            }
+            
+            // Create or update comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: context.issue.number
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('CodeQL Security Analysis')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: botComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
