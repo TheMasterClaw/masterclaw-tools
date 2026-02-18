@@ -224,6 +224,57 @@ Recommendations:
   • Review audit logs for more details: mc logs query
 ```
 
+### Audit Log Viewer 📋
+
+View and analyze security audit logs with powerful filtering:
+
+```bash
+mc audit                       # View recent audit entries (last 24h)
+mc audit -n 100                # Show last 100 entries
+mc audit --hours 48            # Show entries from last 48 hours
+mc audit --summary             # Show security statistics only
+mc audit -t SECURITY_VIOLATION # Filter by event type
+mc audit -s error              # Filter by severity (debug, info, warning, error, critical)
+mc audit --search "deploy"     # Search for text in audit entries
+mc audit --verify              # Verify integrity of displayed entries
+mc audit --json                # Output as JSON
+```
+
+**Event Types:**
+- `AUTH_SUCCESS` / `AUTH_FAILURE` — Authentication events
+- `SECURITY_VIOLATION` — Security violations detected
+- `CONFIG_READ` / `CONFIG_WRITE` — Configuration changes
+- `DEPLOY_START` / `DEPLOY_SUCCESS` / `DEPLOY_FAILURE` — Deployment events
+- `DOCKER_EXEC` — Container execution events
+- `BACKUP_CREATE` / `BACKUP_RESTORE` — Backup operations
+
+**Example Output:**
+```
+📋 Audit Log Viewer
+   Showing last 50 entries from 24 hours ago
+
+Found 42 entries:
+
+ℹ  2/17/2026, 10:30:15 PM DEPLOY_SUCCESS ✓
+   status=success, target=production
+
+⚠  2/17/2026, 10:15:42 PM AUTH_FAILURE ✓
+   cmd: config-read
+
+✖  2/17/2026, 09:45:12 PM SECURITY_VIOLATION ✓
+   violationType=rate_limit_exceeded, source=192.168.1.50
+```
+
+**Audit Integrity Verification:**
+```bash
+mc audit-verify                # Verify all audit log signatures
+mc audit-verify -v             # Show detailed verification results
+mc audit-verify --hours 48     # Verify last 48 hours only
+mc audit-verify --rotate-key   # Rotate audit signing key (invalidates old signatures)
+```
+
+All audit entries are cryptographically signed with HMAC-SHA256 to detect tampering.
+
 ### Error Handling
 All security violations throw `DockerSecurityError` with:
 - Descriptive error codes for programmatic handling

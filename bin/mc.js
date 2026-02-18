@@ -60,7 +60,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.21.0')  // Added secrets management command
+  .version('0.22.0')  // Added audit log viewer command
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -639,6 +639,180 @@ program
       console.log(chalk.yellow('⚠️  Audit log verification completed with warnings'));
     }
   }, 'audit-verify'));
+
+// =============================================================================
+// Audit Log Viewer Commands
+// =============================================================================
+
+const { queryAuditLog, getSecuritySummary, AuditEventType, Severity } = require('../lib/audit');
+
+program
+  .command('audit')
+  .description('View and analyze security audit logs')
+  .option('-n, --limit <number>', 'number of entries to show', '50')
+  .option('-t, --type <type>', 'filter by event type (e.g., SECURITY_VIOLATION, AUTH_FAILURE)')
+  .option('-s, --severity <level>', 'filter by severity (debug, info, warning, error, critical)')
+  .option('--hours <n>', 'show entries from last N hours', '24')
+  .option('--summary', 'show security summary statistics only', false)
+  .option('--json', 'output as JSON', false)
+  .option('--search <term>', 'search for text in audit entries')
+  .option('--verify', 'verify integrity of displayed entries', false)
+  .action(wrapCommand(async (options) => {
+    // Enforce rate limiting
+    await rateLimiter.enforceRateLimit('audit', { command: 'audit' });
+
+    const limit = parseInt(options.limit, 10) || 50;
+    const hours = parseInt(options.hours, 10) || 24;
+
+    // Show summary mode
+    if (options.summary) {
+      console.log(chalk.blue('🔒 Security Audit Summary\n'));
+      console.log(chalk.gray(`   Last ${hours} hours\n`));
+
+      const summary = await getSecuritySummary(hours);
+
+      if (options.json) {
+        console.log(JSON.stringify(summary, null, 2));
+        return;
+      }
+
+      console.log(chalk.cyan('Event Statistics:'));
+      console.log(`  Total events: ${summary.totalEvents}`);
+      console.log(`  Security violations: ${summary.securityViolations > 0 ? chalk.red(summary.securityViolations) : chalk.green(summary.securityViolations)}`);
+      console.log(`  Failed authentications: ${summary.failedAuthentications > 0 ? chalk.yellow(summary.failedAuthentications) : chalk.green(summary.failedAuthentications)}`);
+      console.log('');
+
+      if (Object.keys(summary.bySeverity).length > 0) {
+        console.log(chalk.cyan('By Severity:'));
+        const severityColors = {
+          debug: chalk.gray,
+          info: chalk.blue,
+          warning: chalk.yellow,
+          error: chalk.red,
+          critical: chalk.bgRed.white,
+        };
+        for (const [sev, count] of Object.entries(summary.bySeverity).sort((a, b) => {
+          const order = ['critical', 'error', 'warning', 'info', 'debug'];
+          return order.indexOf(a[0]) - order.indexOf(b[0]);
+        })) {
+          const color = severityColors[sev] || chalk.white;
+          console.log(`  ${color(sev.padEnd(10))} ${count}`);
+        }
+        console.log('');
+      }
+
+      if (Object.keys(summary.byType).length > 0) {
+        console.log(chalk.cyan('Top Event Types:'));
+        const sortedTypes = Object.entries(summary.byType)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+        for (const [type, count] of sortedTypes) {
+          console.log(`  ${type.padEnd(30)} ${count}`);
+        }
+      }
+
+      return;
+    }
+
+    // Normal log viewing mode
+    console.log(chalk.blue('📋 Audit Log Viewer\n'));
+    console.log(chalk.gray(`   Showing last ${limit} entries from ${hours} hours ago\n`));
+
+    const queryOpts = {
+      limit,
+      hours,
+      eventType: options.type || null,
+      severity: options.severity || null,
+    };
+
+    const entries = await queryAuditLog(queryOpts);
+
+    if (entries.length === 0) {
+      console.log(chalk.yellow('⚠️  No audit entries found matching criteria'));
+      return;
+    }
+
+    // Apply search filter if specified
+    let filteredEntries = entries;
+    if (options.search) {
+      const searchLower = options.search.toLowerCase();
+      filteredEntries = entries.filter(e =>
+        JSON.stringify(e).toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify(filteredEntries, null, 2));
+      return;
+    }
+
+    // Display entries
+    const severityIcons = {
+      debug: chalk.gray('◦'),
+      info: chalk.blue('ℹ'),
+      warning: chalk.yellow('⚠'),
+      error: chalk.red('✖'),
+      critical: chalk.bgRed.white('!'),
+    };
+
+    console.log(chalk.cyan(`Found ${filteredEntries.length} entries:\n`));
+
+    for (const entry of filteredEntries) {
+      const icon = severityIcons[entry.severity] || chalk.white('•');
+      const time = new Date(entry.timestamp).toLocaleString();
+      const sigStatus = entry._signature ? chalk.green('✓') : chalk.yellow('○');
+
+      console.log(`${icon} ${chalk.gray(time)} ${chalk.bold(entry.eventType)} ${sigStatus}`);
+
+      if (entry.details && Object.keys(entry.details).length > 0) {
+        const detailStr = Object.entries(entry.details)
+          .filter(([k]) => !k.startsWith('_'))
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ');
+        if (detailStr) {
+          console.log(chalk.gray(`   ${detailStr.substring(0, 100)}${detailStr.length > 100 ? '...' : ''}`));
+        }
+      }
+
+      if (entry.context && entry.context.command) {
+        console.log(chalk.gray(`   cmd: ${entry.context.command}`));
+      }
+
+      console.log('');
+    }
+
+    // Verify integrity if requested
+    if (options.verify && filteredEntries.length > 0) {
+      console.log(chalk.blue('🔍 Verifying entry signatures...\n'));
+
+      const { verifyEntrySignature, getAuditSigningKey } = require('../lib/audit');
+      const key = await getAuditSigningKey();
+
+      let validCount = 0;
+      let invalidCount = 0;
+      let unsignedCount = 0;
+
+      for (const entry of filteredEntries) {
+        if (!entry._signature) {
+          unsignedCount++;
+        } else {
+          const isValid = await verifyEntrySignature(entry, key);
+          if (isValid) validCount++;
+          else invalidCount++;
+        }
+      }
+
+      console.log(chalk.cyan('Verification Results:'));
+      console.log(`  Valid signatures: ${chalk.green(validCount)}`);
+      console.log(`  Invalid signatures: ${invalidCount > 0 ? chalk.red(invalidCount) : chalk.green(invalidCount)}`);
+      console.log(`  Unsigned entries: ${unsignedCount > 0 ? chalk.yellow(unsignedCount) : chalk.green(unsignedCount)}`);
+
+      if (invalidCount > 0) {
+        console.log(chalk.red('\n⚠️  Some entries have invalid signatures!'));
+        process.exit(ExitCode.SECURITY_VIOLATION);
+      }
+    }
+  }, 'audit'));
 
 // =============================================================================
 // Rate Limiting Commands
