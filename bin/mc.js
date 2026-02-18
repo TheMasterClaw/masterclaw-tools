@@ -68,7 +68,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.29.0')  // Feature: Added mc top command for real-time container resource monitoring
+  .version('0.30.0')  // Feature: Added mc context sync command to sync rex-deus context to AI memory
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 

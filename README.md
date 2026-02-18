@@ -1664,6 +1664,69 @@ mc config reset --force                  # Skip confirmation
 }
 ```
 
+### `mc context sync` 🆕
+Synchronize rex-deus context files (preferences, projects, goals, knowledge, people) into the AI's memory system. This creates a live bridge between static documentation and dynamic AI context awareness.
+
+```bash
+# Sync all context files
+mc context sync                          # Sync all rex-deus context to AI memory
+
+# Sync specific sections only
+mc context sync --sections preferences,projects    # Sync only preferences and projects
+mc context sync --sections goals                   # Sync only goals
+
+# Preview changes without syncing
+mc context sync --dry-run                # Show what would be synced without making changes
+
+# Force re-sync (overwrite existing)
+mc context sync --force                  # Re-sync all content, even if unchanged
+
+# Add custom tags
+mc context sync --tag personal           # Add "personal" tag to all synced memories
+```
+
+**Sync Sections:**
+| Section | Memory Category | Content |
+|---------|-----------------|---------|
+| `preferences` | `user_preferences` | Communication style, tech stack, values |
+| `projects` | `active_projects` | Current projects, progress, priorities |
+| `goals` | `user_goals` | Short/medium/long-term goals |
+| `knowledge` | `domain_knowledge` | Rex's expertise areas |
+| `people` | `relationships` | Contacts and relationships |
+
+**Features:**
+- **Smart deduplication** — Content hashing skips unchanged files
+- **Metadata enrichment** — Memories tagged with source, priority, category
+- **Incremental sync** — Only syncs modified content
+- **Traceable** — All memories link back to source file
+- **Privacy-first** — Local processing, no external calls
+
+**Workflow Example:**
+```bash
+# 1. Initial sync of all context
+mc context sync
+
+# 2. Make changes to rex-deus context files
+vim ~/rex-deus/context/goals.md
+
+# 3. Sync only the changes
+mc context sync --sections goals
+
+# 4. Verify memories are searchable
+mc memory search "short-term goals"
+```
+
+**Integration with AI:**
+Once synced, the AI can reference this context in conversations:
+- "What are Rex's current projects?" → Queries active_projects
+- "What's his tech stack preference?" → Queries user_preferences
+- "Tell me about his goals" → Queries user_goals
+
+**Requirements:**
+- rex-deus repository must be accessible
+- MasterClaw Core must be running with memory support
+- API connection to Core (configured via `mc config`)
+
 ### `mc export` 🆕
 Export data from MasterClaw for backup and migration (complements `mc import`)
 ```bash
