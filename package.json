@@ -1,6 +1,6 @@
 {
   "name": "masterclaw-tools",
-  "version": "0.31.0",
+  "version": "0.33.0",
   "description": "CLI utilities for MasterClaw - command your AI familiar from the terminal",
   "main": "bin/mc.js",
   "bin": {
@@ -24,7 +24,10 @@
     "maintenance",
     "secrets",
     "monitoring",
-    "resource-monitor"
+    "resource-monitor",
+    "log-analysis",
+    "plugins",
+    "extensible"
   ],
   "author": "Rex deus",
   "license": "MIT",

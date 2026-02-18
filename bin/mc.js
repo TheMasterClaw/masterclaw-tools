@@ -60,6 +60,9 @@ const { aliasCmd } = require('../lib/alias');
 const { metricsCmd } = require('../lib/metrics');
 const { topCmd } = require('../lib/top');
 const changelogCmd = require('../lib/changelog');
+const { runAnalysis, displayResults } = require('../lib/analyze');
+const { pluginCmd, getInstalledPlugins, executePlugin } = require('../lib/plugin');
+const clientCmd = require('../lib/client');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -69,7 +72,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.31.0')  // Feature: Added mc changelog command to view ecosystem changelogs
+  .version('0.33.0')  // Feature: Added plugin system for custom command extensions
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -152,6 +155,8 @@ program.addCommand(aliasCmd);
 program.addCommand(metricsCmd);
 program.addCommand(topCmd);
 program.addCommand(changelogCmd);
+program.addCommand(clientCmd);
+program.addCommand(pluginCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
@@ -1403,12 +1408,84 @@ program
   }, 'performance'));
 
 // =============================================================================
-// Parse and Execute
+// Log Analysis Command - Intelligent log analysis and anomaly detection
 // =============================================================================
 
-program.parse();
+program
+  .command('analyze')
+  .description('Analyze logs for errors, patterns, and anomalies')
+  .option('-s, --service <name>', 'Service to analyze (core, backend, gateway, all)', 'all')
+  .option('-t, --time <duration>', 'Time window (1h, 6h, 24h, 7d)', '1h')
+  .option('-f, --focus <type>', 'Focus on specific issue type (critical, warning, security, performance)')
+  .option('-v, --verbose', 'Show detailed error patterns')
+  .option('-j, --json', 'Output as JSON')
+  .action(wrapCommand(async (options) => {
+    const ora = require('ora');
+    const spinner = ora('Analyzing logs...').start();
 
-// Show help if no command provided
-if (!process.argv.slice(2).length) {
-  program.outputHelp();
-}
+    try {
+      const results = await runAnalysis({
+        service: options.service,
+        since: options.time,
+        focus: options.focus,
+      });
+
+      spinner.stop();
+
+      displayResults(results, {
+        verbose: options.verbose,
+        json: options.json,
+      });
+
+      // Exit with error if critical issues found
+      const hasCritical = results.anomalies.some(a => a.severity === 'critical');
+      if (hasCritical) {
+        process.exit(ExitCode.GENERAL_ERROR);
+      }
+    } catch (err) {
+      spinner.fail(`Analysis failed: ${err.message}`);
+      throw err;
+    }
+  }, 'analyze'));
+
+// =============================================================================
+// Parse and Execute (with plugin loading)
+// =============================================================================
+
+(async () => {
+  // Load and register plugins before parsing
+  try {
+    const plugins = await getInstalledPlugins();
+    
+    for (const plugin of plugins) {
+      if (!plugin.enabled || !plugin.installed || !plugin.manifest) {
+        continue;
+      }
+      
+      const commandName = plugin.manifest.command || plugin.command;
+      if (!commandName) {
+        continue;
+      }
+      
+      // Register the plugin as a top-level command
+      program
+        .command(commandName)
+        .description(plugin.manifest.description || `Plugin: ${plugin.name}`)
+        .allowUnknownOption()
+        .action(async (options, command) => {
+          const args = command.args || [];
+          await executePlugin(plugin.name, args);
+        });
+    }
+  } catch (error) {
+    // Silently fail - plugins are optional
+  }
+  
+  // Now parse the command line
+  program.parse();
+  
+  // Show help if no command provided
+  if (!process.argv.slice(2).length) {
+    program.outputHelp();
+  }
+})();

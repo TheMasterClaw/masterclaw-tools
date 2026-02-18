@@ -481,6 +481,73 @@ mc alias import ~/mc-aliases-backup.json
 
 Aliases are stored in `~/.openclaw/workspace/rex-deus/config/aliases.json` and integrate with rex-deus for personalized command shortcuts.
 
+### `mc plugin` 🆕
+**Plugin System** — Extend `mc` with custom commands without modifying core code. Install plugins from npm, git, or create your own.
+
+```bash
+# List installed plugins
+mc plugin list                    # Show installed plugins
+mc plugin list -a                 # Include disabled plugins
+
+# Install plugins
+mc plugin install mc-plugin-hello              # From npm
+mc plugin install https://github.com/user/plugin.git  # From git
+mc plugin install ./my-local-plugin            # From local directory
+
+# Manage plugins
+mc plugin uninstall mc-plugin-hello            # Remove a plugin
+mc plugin enable mc-plugin-hello               # Enable a disabled plugin
+mc plugin disable mc-plugin-hello              # Disable a plugin
+mc plugin info mc-plugin-hello                 # Show plugin details
+
+# Search and update
+mc plugin search hello                         # Search npm for plugins
+mc plugin update mc-plugin-hello               # Update a plugin
+mc plugin update --all                         # Update all plugins
+
+# Development
+mc plugin create mc-plugin-mine                # Scaffold a new plugin
+mc plugin run mc-plugin-hello -- arg1 arg2     # Run plugin directly
+```
+
+**Features:**
+- **Install from multiple sources** — npm registry, git repositories, or local directories
+- **Automatic dependency management** — npm dependencies installed automatically
+- **Lifecycle hooks** — Install, update, and uninstall scripts
+- **Permission system** — Plugins declare required permissions (fs, network, docker)
+- **Enable/disable** — Temporarily disable plugins without uninstalling
+- **Hot registration** — Installed plugins immediately available as `mc <command>`
+
+**Plugin Manifest Example:**
+```json
+{
+  "name": "mc-plugin-hello",
+  "version": "1.0.0",
+  "description": "A friendly greeting plugin",
+  "author": "Your Name <email@example.com>",
+  "main": "index.js",
+  "command": "hello",
+  "dependencies": ["chalk"],
+  "permissions": ["fs"]
+}
+```
+
+**Creating a Plugin:**
+```bash
+# 1. Scaffold a new plugin
+mc plugin create mc-plugin-mycommand
+
+# 2. Edit the generated files
+cd mc-plugin-mycommand
+# Edit index.js with your logic
+
+# 3. Install and test
+mc plugin install ./mc-plugin-mycommand
+mc mycommand
+```
+
+See [rex-deus/docs/plugin-system.md](../rex-deus/docs/plugin-system.md) for complete documentation.
+
 ### `mc notify` 🆕
 Manage alert notifications across multiple channels (WhatsApp, Discord, Slack, Telegram).
 Configure, test, and monitor alerts for service downtime, SSL expiration, costs, and security threats.
@@ -1237,6 +1304,91 @@ mc deploy history              # Show deployment history
 
 ### `mc logs`
 Comprehensive log management and viewing
+
+### `mc analyze` 🆕
+Intelligent log analysis and anomaly detection — automatically analyze logs for errors, patterns, and potential issues
+
+```bash
+# Analyze logs for all services (default: last hour)
+mc analyze
+
+# Analyze specific service
+mc analyze --service core         # Analyze core service logs
+mc analyze --service backend      # Analyze backend logs
+mc analyze --service gateway      # Analyze gateway logs
+
+# Analyze different time windows
+mc analyze --time 1h              # Last hour (default)
+mc analyze --time 6h              # Last 6 hours
+mc analyze --time 24h             # Last 24 hours
+mc analyze --time 7d              # Last 7 days
+
+# Focus on specific issue types
+mc analyze --focus critical       # Focus on critical issues
+mc analyze --focus security       # Focus on security events
+mc analyze --focus performance    # Focus on performance issues
+
+# Output options
+mc analyze --verbose              # Show detailed error patterns
+mc analyze --json                 # Output as JSON for automation
+```
+
+**Analysis Features:**
+- **Error Pattern Detection** — Identifies runtime errors, network issues, resource exhaustion, SSL problems
+- **Anomaly Detection** — Detects error spikes, repeated errors, service imbalances
+- **Security Analysis** — Flags authentication failures and suspicious access patterns
+- **Performance Insights** — Identifies timeouts and slow requests
+- **Actionable Recommendations** — Suggests specific commands to fix issues
+
+**Detected Categories:**
+| Category | Description | Severity |
+|----------|-------------|----------|
+| `runtime` | Application errors and exceptions | error |
+| `network` | Connection issues, refused connections | error |
+| `resource` | Memory/disk exhaustion | critical |
+| `security` | Auth failures, access violations | warning |
+| `ssl` | Certificate errors, TLS issues | critical |
+| `database` | SQLite/ChromaDB errors | error |
+| `health` | Health check failures | error |
+| `performance` | Timeouts, slow requests | warning |
+| `rate_limiting` | Rate limit violations | warning |
+
+**Example Output:**
+```
+🔍 MasterClaw Log Analysis
+
+Analyzed 1,247 log lines in 234ms
+
+Error Summary:
+  runtime         12
+  network          3
+  ssl              1
+
+Top Error Patterns:
+  ❌ [database] Database connection pool exhausted
+     Count: 8 | Service: backend
+  ⚠️ [network] Connection refused to mc-core:8000
+     Count: 3 | Service: backend
+
+Detected Anomalies:
+  🔴 Error rate is 3.2x above normal
+
+Insights & Recommendations:
+  🔴 Resource Exhaustion Detected
+     Check disk space with `mc doctor --category system`
+     → Run: mc doctor --category system
+
+  ⚠️ Network Connectivity Issues
+     Check service dependencies with `mc deps-check`
+     → Run: mc deps-check
+
+Overall Health:
+  🔴 CRITICAL - Immediate attention required
+```
+
+**Exit Codes:**
+- `0` — No critical issues detected
+- `1` — Critical issues detected (useful for CI/CD alerting)
 
 ### `mc exec` 🆕
 Execute commands in running MasterClaw containers — like `kubectl exec` or `docker exec` but tailored for MasterClaw
