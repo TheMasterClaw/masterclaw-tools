@@ -1,3 +1,87 @@
+# MasterClaw Improvement: Health History API Integration
+
+## Summary
+
+Added **health history integration** to the `mc health` command, connecting the CLI to the Core API's health history endpoints. This bridges the gap between live health checks and historical tracking, enabling operators to view trends, analyze uptime, and make data-driven decisions about system reliability.
+
+## What Was Improved
+
+### 1. New Health History Commands
+
+**`mc health history`** — View health check history from the Core API
+- Filter by component (`--component`)
+- Time range filtering (`--since` in hours)
+- Limit results (`--limit`)
+- JSON output for scripting (`--json`)
+
+**`mc health summary`** — Get health status summary with availability statistics
+- Overall availability percentage
+- Breakdown by component (healthy/degraded/unhealthy counts)
+- Average response times per component
+- Configurable time period
+
+**`mc health uptime`** — View uptime statistics and outage history
+- Uptime percentage with color-coded thresholds
+- Outage detection with start/end times
+- Duration calculations for each outage
+- Ongoing outage detection
+
+**`mc health record`** — Manually record health checks
+- Record status, component, details, response time
+- Useful for post-maintenance verification
+- Integration with external monitoring systems
+
+### 2. Enhanced `mc health check` Command
+
+Added `--record` flag to record health checks to the history API:
+```bash
+mc health check --record    # Records results after checking
+```
+
+## Benefits
+
+| Feature | Benefit |
+|---------|---------|
+| **Historical Trends** | Track health patterns over days/weeks |
+| **Uptime Reporting** | Generate SLA reports with outage details |
+| **Component Analysis** | Identify problematic services |
+| **Post-Incident Review** | Analyze outage durations and frequency |
+| **Integration** | JSON output enables scripting and external tools |
+
+## Usage Examples
+
+```bash
+# View last 24 hours of health history
+mc health history
+
+# Check 7-day uptime for a specific component
+mc health uptime --component mc-core --days 7
+
+# Get summary for the last week
+mc health summary --since 168
+
+# Record manual health check after maintenance
+mc health record --status healthy --component "postgres" --details "Post-backup verification"
+
+# Export uptime data as JSON for external dashboard
+mc health uptime --json > uptime-report.json
+```
+
+## Files Modified
+
+- `lib/health.js` — Added health history API integration commands
+- `rex-deus/context/workflows.md` — Added health history workflows and updated checklist
+
+## API Integration
+
+The new commands integrate with these Core API endpoints:
+- `GET /health/history` — Retrieve health records
+- `GET /health/history/summary` — Get aggregated statistics
+- `GET /health/history/uptime` — Calculate uptime and outages
+- `POST /health/history/record` — Record new health checks
+
+---
+
 # MasterClaw Improvement: Docker Status Timeout Protection
 
 ## Summary
