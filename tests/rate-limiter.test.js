@@ -437,7 +437,7 @@ describe('Rate Limiter Module', () => {
     test('returns true for valid state', () => {
       const validState = {
         'test-cmd': [Date.now(), Date.now() - 1000],
-        'another-cmd': [Date.now()],
+        'another_cmd': [Date.now()],
       };
       expect(rateLimiter.isValidRateLimitState(validState)).toBe(true);
     });
@@ -503,6 +503,61 @@ describe('Rate Limiter Module', () => {
     test('returns true for empty object state', () => {
       expect(rateLimiter.isValidRateLimitState({})).toBe(true);
     });
+
+    test('returns false for state with prototype pollution keys', () => {
+      // Use Object.defineProperty to actually create an own property
+      const pollutedState = {};
+      Object.defineProperty(pollutedState, '__proto__', {
+        value: [Date.now()],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      expect(rateLimiter.isValidRateLimitState(pollutedState)).toBe(false);
+    });
+
+    test('returns false for state with constructor key', () => {
+      const pollutedState = {};
+      Object.defineProperty(pollutedState, 'constructor', {
+        value: [Date.now()],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      expect(rateLimiter.isValidRateLimitState(pollutedState)).toBe(false);
+    });
+
+    test('returns false for state with prototype key', () => {
+      const pollutedState = {};
+      Object.defineProperty(pollutedState, 'prototype', {
+        value: [Date.now()],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      expect(rateLimiter.isValidRateLimitState(pollutedState)).toBe(false);
+    });
+
+    test('returns false for state with oversized arrays', () => {
+      const oversizedState = {
+        'test-cmd': Array(rateLimiter.MAX_ENTRIES_PER_COMMAND * 3).fill(Date.now()),
+      };
+      expect(rateLimiter.isValidRateLimitState(oversizedState)).toBe(false);
+    });
+
+    test('returns false for state with timestamps too far in the future', () => {
+      const invalidState = {
+        'test-cmd': [Date.now() + 1000000000], // Way in the future
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
+
+    test('returns false for state with timestamps too old', () => {
+      const invalidState = {
+        'test-cmd': [Date.now() - (366 * 24 * 60 * 60 * 1000)], // Over a year ago
+      };
+      expect(rateLimiter.isValidRateLimitState(invalidState)).toBe(false);
+    });
   });
 
   // ===========================================================================
@@ -546,21 +601,30 @@ describe('Rate Limiter Module', () => {
 
     test('detects and logs prototype pollution attempts', async () => {
       const { logSecurityViolation } = require('../lib/audit');
-      
+
       // Mock fs.pathExists to return true
       jest.spyOn(fs, 'pathExists').mockResolvedValueOnce(true);
-      
-      // Mock readJson to return a polluted object
-      const pollutedState = JSON.parse('{ "__proto__": { "polluted": true }, "validCmd": [123] }');
+
+      // Create a polluted object with __proto__ as an own property
+      const pollutedState = {};
+      Object.defineProperty(pollutedState, '__proto__', {
+        value: { polluted: true },
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      pollutedState.validCmd = [123];
+
       jest.spyOn(fs, 'readJson').mockResolvedValueOnce(pollutedState);
 
       await rateLimiter.loadRateLimitState();
 
-      // Verify security violation was logged
+      // Verify security violation was logged with new event type
       expect(logSecurityViolation).toHaveBeenCalledWith(
-        'RATE_LIMIT_STATE_CORRUPTION',
+        'RATE_LIMIT_STATE_POLLUTION',
         expect.objectContaining({
-          reason: 'Prototype pollution detected in rate limit state',
+          pollutionType: 'direct_key',
+          details: '__proto__',
         })
       );
 
