@@ -75,6 +75,7 @@ const dashboardCmd = require('../lib/dashboard');
 const webhookCmd = require('../lib/webhook');
 const restartCmd = require('../lib/restart');
 const k8sCmd = require('../lib/k8s');
+const cacheCmd = require('../lib/cache');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -84,7 +85,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.45.0')  // Feature: Added mc k8s command for Kubernetes deployment management
+  .version('0.46.0')  // Feature: Added mc cache command for Redis cache management
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -180,6 +181,7 @@ program.addCommand(dashboardCmd);
 program.addCommand(webhookCmd);
 program.addCommand(restartCmd);
 program.addCommand(k8sCmd);
+program.addCommand(cacheCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
