@@ -87,7 +87,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.47.0')  // Feature: Enhanced mc heal with auto-fix capabilities
+  .version('0.48.0')  // Feature: Cost budget alerts with automated monitoring
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
