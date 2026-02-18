@@ -92,6 +92,51 @@ Rate limiting protects against:
 - Resource exhaustion from rapid command execution
 - Automated attack scripts
 
+### Circuit Breaker ⚡
+MasterClaw CLI includes circuit breaker protection for service resilience:
+
+```bash
+mc circuits              # Show circuit breaker status for all services
+mc circuits --json       # Output as JSON for monitoring
+mc circuits --reset core # Reset circuit for a specific service
+mc circuits --reset-all  # Reset all circuits
+```
+
+**Features:**
+- **Fail-fast protection** — Opens circuit after consecutive failures to prevent cascading failures
+- **Automatic recovery** — Tests service health in half-open state before fully closing
+- **Per-service isolation** — Each service has its own circuit; failures don't affect other services
+- **Error rate monitoring** — Opens circuit when error rate exceeds configurable threshold
+
+**Circuit States:**
+| State | Icon | Description |
+|-------|------|-------------|
+| `CLOSED` | ✅ | Normal operation - requests pass through |
+| `OPEN` | 🔴 | Failure threshold exceeded - requests fail fast |
+| `HALF_OPEN` | 🟡 | Testing if service has recovered |
+
+**Example Output:**
+```
+⚡ MasterClaw Circuit Breaker Status
+
+✅ AI Core
+   State: CLOSED ●
+   Calls: 245 total (243 success, 2 failed)
+   Error Rate: 0.8%
+
+🔴 Backend API
+   State: OPEN ●
+   Calls: 15 total (10 success, 5 failed)
+   Error Rate: 33.3%
+   Recent Failures: 5 in last 60s
+```
+
+**Configuration:**
+- Failure threshold: 3 consecutive failures
+- Reset timeout: 15 seconds before attempting recovery
+- Success threshold: 2 consecutive successes to close
+- Error rate threshold: 60%
+
 ### Prototype Pollution Protection
 Config operations are protected against prototype pollution attacks:
 - **Dangerous keys blocked** — `__proto__`, `constructor`, and `prototype` keys are rejected
@@ -692,6 +737,50 @@ Checks performed:
 - SSL certificate expiration
 - Infrastructure health checks
 
+### `mc circuits` 🆕
+View and manage circuit breaker status for service resilience
+
+```bash
+mc circuits                    # Show circuit breaker status for all services
+mc circuits --json             # Output as JSON for monitoring integration
+mc circuits --reset core       # Reset circuit for specific service
+mc circuits --reset-all        # Reset all circuits to CLOSED state
+```
+
+**Circuit Breaker States:**
+| State | Description | Visual |
+|-------|-------------|--------|
+| `CLOSED` | Normal operation - requests pass through | ✅ |
+| `OPEN` | Failure threshold exceeded - fast fail | 🔴 |
+| `HALF_OPEN` | Testing recovery with limited traffic | 🟡 |
+
+**Example Output:**
+```
+⚡ MasterClaw Circuit Breaker Status
+
+✅ AI Core
+   State: CLOSED ●
+   Calls: 245 total (243 success, 2 failed)
+   Error Rate: 0.8%
+
+🔴 Backend API
+   State: OPEN ●
+   Calls: 15 total (10 success, 5 failed)
+   Error Rate: 33.3%
+   Recent Failures: 5 in last 60s
+```
+
+**Benefits:**
+- **Fail-fast protection** — Prevents cascading failures when services are unstable
+- **Automatic recovery** — Tests service recovery without overwhelming it
+- **Per-service isolation** — Each service has independent circuit protection
+- **Reduced load** — Stops hammering failing services with repeated requests
+
+**When to reset circuits:**
+- After fixing a service that was causing failures
+- If a circuit opened due to a transient network issue
+- During maintenance when you want to force retry behavior
+
 ### `mc status`
 Check health of all MasterClaw services
 ```bash
@@ -864,6 +953,79 @@ mc restore run --dry-run       # Preview what would be restored
 - Core AI memory and state
 - ChromaDB vector embeddings
 - Environment configuration (saved as `.env.restored` for review)
+
+### `mc secrets` 🔐
+Secure secrets management for API keys, tokens, and credentials across the MasterClaw ecosystem.
+
+```bash
+# Check secrets configuration
+mc secrets check                         # Validate all required secrets are set
+
+# List and view secrets (masked by default)
+mc secrets list                          # List all configured secrets
+mc secrets list --show-values            # Show actual values (use with caution!)
+
+# Set and get secrets
+mc secrets set GATEWAY_TOKEN <token>     # Set a secret value
+mc secrets set OPENAI_API_KEY <key>      # Set API key with validation
+mc secrets set ANTHROPIC_API_KEY <key>   # Set Anthropic key
+mc secrets get GATEWAY_TOKEN             # Get a secret (masked display)
+
+# Rotate and manage secrets
+mc secrets rotate GATEWAY_TOKEN          # Auto-generate new gateway token
+mc secrets rotate OPENAI_API_KEY --value <new-key>  # Rotate with custom value
+mc secrets delete OPENAI_API_KEY         # Delete a secret
+
+# Validate secrets against services
+mc secrets validate GATEWAY_TOKEN        # Test token against gateway
+mc secrets validate OPENAI_API_KEY       # Verify API key with OpenAI
+mc secrets validate ANTHROPIC_API_KEY    # Verify API key with Anthropic
+
+# Sync secrets between CLI and .env
+mc secrets sync                          # Sync CLI secrets to .env file
+mc secrets sync --direction from-env     # Sync .env to CLI storage
+mc secrets sync --dry-run                # Preview changes without applying
+
+# Export secrets (masked)
+mc secrets export                        # Export as JSON (masked values)
+mc secrets export --format env           # Export as .env format
+mc secrets export -o secrets-backup.json # Export to file
+```
+
+**Security Features:**
+- **Secure storage** — Secrets stored with 0o600 file permissions
+- **Masked display** — Values are masked by default (show first/last 4 chars)
+- **Format validation** — Validates API key formats before saving
+- **Audit logging** — All secret operations logged (without values)
+- **No plain text logging** — Secrets are never logged in plain text
+
+**Required Secrets:**
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `GATEWAY_TOKEN` | ✅ | OpenClaw Gateway authentication token |
+| `OPENAI_API_KEY` | ❌ | OpenAI API key for GPT models |
+| `ANTHROPIC_API_KEY` | ❌ | Anthropic API key for Claude models |
+
+**Workflow Example:**
+```bash
+# 1. Check current secrets status
+mc secrets check
+
+# 2. Set required secrets
+mc secrets set GATEWAY_TOKEN mc_my_secure_token_123
+mc secrets set OPENAI_API_KEY sk-...
+
+# 3. Validate secrets work
+mc secrets validate GATEWAY_TOKEN
+mc secrets validate OPENAI_API_KEY
+
+# 4. Sync to .env for Docker deployment
+mc secrets sync
+
+# 5. Rotate a compromised token
+mc secrets rotate GATEWAY_TOKEN
+mc secrets sync  # Don't forget to sync!
+```
 
 ### `mc config`
 Manage CLI configuration — view, modify, export, and import settings
@@ -1340,6 +1502,7 @@ npm test -- --coverage
 | `docker.security.test.js` | Docker command validation, container security |
 | `exec.security.test.js` | **Container execution security** — `mc exec` command hardening |
 | `config.security.test.js` | Config file permissions, prototype pollution protection |
+| `secrets.test.js` | **Secrets management** — Secure API key and token handling |
 | `services.security.test.js` | Service health check security |
 | `audit.integrity.test.js` | Audit log signing and tamper detection |
 | `security-monitor.test.js` | Threat detection algorithms |

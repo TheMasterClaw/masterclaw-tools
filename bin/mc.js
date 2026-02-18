@@ -48,6 +48,8 @@ const benchmark = require('../lib/benchmark');
 const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
 const maintenance = require('../lib/maintenance');
 const configCmd = require('../lib/config-cmd');
+const { getAllCircuitStatus, resetAllCircuits, CircuitState } = require('../lib/circuit-breaker');
+const { secretsCmd } = require('../lib/secrets');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -57,7 +59,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.20.0')  // Added events command for event tracking
+  .version('0.21.0')  // Added secrets management command
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -131,6 +133,7 @@ program.addCommand(events);
 program.addCommand(env.program);
 program.addCommand(maintenance);
 program.addCommand(configCmd);
+program.addCommand(secretsCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
@@ -705,6 +708,115 @@ program
     console.log(chalk.gray('Rate limits help prevent abuse and accidental command flooding.'));
     console.log(chalk.gray('Limits are per-minute (except where noted).'));
   }, 'rate-limit'));
+
+// =============================================================================
+// Circuit Breaker Commands - Service Resilience
+// =============================================================================
+
+program
+  .command('circuits')
+  .description('View and manage circuit breaker status for service resilience')
+  .option('-s, --status', 'show detailed circuit status', true)
+  .option('--reset <service>', 'reset circuit for a specific service (core, backend, interface, gateway)')
+  .option('--reset-all', 'reset all circuits')
+  .option('--json', 'output as JSON')
+  .action(wrapCommand(async (options) => {
+    // Handle reset operations
+    if (options.reset || options.resetAll) {
+      if (options.resetAll) {
+        resetAllCircuits();
+        console.log(chalk.green('✅ All circuits reset'));
+        return;
+      }
+      
+      const circuitName = `service-${options.reset}`;
+      const { getCircuit } = require('../lib/circuit-breaker');
+      const circuit = getCircuit(circuitName);
+      if (circuit) {
+        circuit.closeCircuit();
+        console.log(chalk.green(`✅ Circuit for '${options.reset}' reset`));
+      } else {
+        console.log(chalk.yellow(`⚠️  No circuit found for '${options.reset}'`));
+      }
+      return;
+    }
+
+    // Default: show status
+    const statuses = getAllCircuitStatus();
+    
+    if (options.json) {
+      console.log(JSON.stringify(statuses, null, 2));
+      return;
+    }
+
+    console.log(chalk.blue('⚡ MasterClaw Circuit Breaker Status\n'));
+
+    if (statuses.length === 0) {
+      console.log(chalk.gray('No active circuits. Run health checks to initialize.'));
+      return;
+    }
+
+    // Service name mapping
+    const serviceNames = {
+      'service-core': 'AI Core',
+      'service-backend': 'Backend API', 
+      'service-interface': 'Interface',
+      'service-gateway': 'Gateway',
+    };
+
+    for (const status of statuses) {
+      const displayName = serviceNames[status.name] || status.name;
+      
+      // State icon
+      let stateIcon, stateColor;
+      switch (status.state) {
+        case 'CLOSED':
+          stateIcon = '✅';
+          stateColor = chalk.green;
+          break;
+        case 'OPEN':
+          stateIcon = '🔴';
+          stateColor = chalk.red;
+          break;
+        case 'HALF_OPEN':
+          stateIcon = '🟡';
+          stateColor = chalk.yellow;
+          break;
+        default:
+          stateIcon = '⚪';
+          stateColor = chalk.gray;
+      }
+
+      // Health icon
+      let healthIcon;
+      switch (status.health) {
+        case 'healthy':
+          healthIcon = chalk.green('●');
+          break;
+        case 'degraded':
+          healthIcon = chalk.yellow('●');
+          break;
+        case 'unhealthy':
+          healthIcon = chalk.red('●');
+          break;
+        default:
+          healthIcon = chalk.gray('○');
+      }
+
+      console.log(`${stateIcon} ${chalk.bold(displayName)}`);
+      console.log(`   State: ${stateColor(status.state)} ${healthIcon}`);
+      console.log(`   Calls: ${status.stats.totalCalls} total (${status.stats.totalSuccesses} success, ${status.stats.totalFailures} failed)`);
+      console.log(`   Error Rate: ${status.stats.errorRate}`);
+      
+      if (status.stats.failuresInWindow > 0) {
+        console.log(chalk.yellow(`   Recent Failures: ${status.stats.failuresInWindow} in last ${status.config.monitorWindowMs / 1000}s`));
+      }
+      console.log('');
+    }
+
+    console.log(chalk.gray('Circuits protect against cascading failures by failing fast when services are unstable.'));
+    console.log(chalk.gray('States: CLOSED (normal), OPEN (failing fast), HALF_OPEN (testing recovery)'));
+  }, 'circuits'));
 
 // =============================================================================
 // Security Monitor Commands
