@@ -63,7 +63,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.24.0')  // Added mc check command for dependency validation
+  .version('0.25.0')  // Security: Added input validation, retry logic, and correlation ID to performance module
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
