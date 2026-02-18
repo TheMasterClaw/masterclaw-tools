@@ -63,6 +63,7 @@ const changelogCmd = require('../lib/changelog');
 const { runAnalysis, displayResults } = require('../lib/analyze');
 const { pluginCmd, getInstalledPlugins, executePlugin } = require('../lib/plugin');
 const clientCmd = require('../lib/client');
+const disasterCmd = require('../lib/disaster');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -72,7 +73,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.33.0')  // Feature: Added plugin system for custom command extensions
+  .version('0.34.0')  // Feature: Added disaster recovery command (mc disaster)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -157,6 +158,7 @@ program.addCommand(topCmd);
 program.addCommand(changelogCmd);
 program.addCommand(clientCmd);
 program.addCommand(pluginCmd);
+program.addCommand(disasterCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
