@@ -66,6 +66,7 @@ const clientCmd = require('../lib/client');
 const disasterCmd = require('../lib/disaster');
 const { contactsCmd } = require('../lib/contacts');
 const { runQuickstart } = require('../lib/quickstart');
+const pruneCmd = require('../lib/prune');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -75,7 +76,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.36.0')  // Feature: Added quickstart wizard (mc quickstart)
+  .version('0.37.0')  // Feature: Added Docker system prune command (mc prune)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -162,6 +163,7 @@ program.addCommand(changelogCmd);
 program.addCommand(clientCmd);
 program.addCommand(pluginCmd);
 program.addCommand(disasterCmd);
+program.addCommand(pruneCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
