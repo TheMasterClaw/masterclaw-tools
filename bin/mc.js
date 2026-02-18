@@ -78,6 +78,7 @@ const k8sCmd = require('../lib/k8s');
 const cacheCmd = require('../lib/cache');
 const scanCmd = require('../lib/scan');
 const { runHeal } = require('../lib/heal');
+const sloCmd = require('../lib/slo');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -185,6 +186,7 @@ program.addCommand(restartCmd);
 program.addCommand(k8sCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
+program.addCommand(sloCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
