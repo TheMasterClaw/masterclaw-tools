@@ -2438,6 +2438,103 @@ Uses the bulk deletion API (`/v1/sessions/bulk-delete`) for efficient cleanup:
 - Shows session age distribution before cleanup
 - Displays statistics before and after cleanup
 
+### `mc size` 🆕
+Analyze disk usage of MasterClaw components — see exactly what's consuming storage across data directories, Docker volumes, containers, and images.
+
+```bash
+# Show complete disk usage analysis
+mc size
+
+# Show only data directory sizes
+mc size --data-only
+
+# Show only Docker resource sizes
+mc size --docker-only
+
+# Show detailed breakdown of subdirectories
+mc size --breakdown
+
+# Only show items larger than 100MB
+mc size --threshold 100MB
+
+# Output as JSON for scripting
+mc size --json
+```
+
+**Analysis Categories:**
+| Category | Description |
+|----------|-------------|
+| **Data Directories** | Backups, logs, data, memory, sessions |
+| **Docker Volumes** | mc-data, mc-backend-data, mc-chroma-data, etc. |
+| **Docker Containers** | Running and stopped container sizes |
+| **Docker Images** | MasterClaw-related images and tags |
+
+**Example Output:**
+```
+🐾 MasterClaw Disk Usage Analysis
+
+Infrastructure: /opt/masterclaw-infrastructure
+
+📁 Data Directories
+──────────────────────────────────────────────────
+  backups      2.45 GB
+  logs        512.34 MB
+  data         1.23 GB
+  memory     256.00 MB
+  sessions   128.00 MB
+  ────────────────────────────────────────────────
+  Total        4.56 GB
+
+💾 Docker Volumes
+──────────────────────────────────────────────────
+  mc-chroma-data           1.20 GB
+  mc-backend-data        450.00 MB
+  mc-gateway-data         32.00 MB
+  mc-data                 16.00 MB
+  ────────────────────────────────────────────────
+  Total                    1.70 GB
+
+🐳 Docker Containers
+──────────────────────────────────────────────────
+  ● mc-chroma         1.20 GB  (virtual 2.45 GB)
+  ● mc-backend      450.00 MB  (virtual 1.12 GB)
+  ● mc-core         256.00 MB  (virtual 890.00 MB)
+  ● mc-gateway       32.00 MB  (virtual 245.00 MB)
+  ● mc-traefik       16.00 MB  (virtual 78.00 MB)
+  ────────────────────────────────────────────────
+  Total               1.94 GB
+
+📦 Docker Images
+──────────────────────────────────────────────────
+  masterclaw/core:latest     890.00 MB
+  masterclaw/backend:latest  670.00 MB
+  chromadb/chroma:latest     1.25 GB
+  traefik:v3.0               62.00 MB
+  ────────────────────────────────────────────────
+  Total                      2.87 GB
+
+══════════════════════════════════════════════════
+  Grand Total:           11.07 GB
+══════════════════════════════════════════════════
+
+💡 Tips:
+  • Large backup directory - consider running: mc backup cleanup
+  • Run with --json flag for machine-readable output
+  • Run with --breakdown for detailed subdirectory analysis
+```
+
+**Use Cases:**
+- **Storage planning** — Understand your total footprint before scaling
+- **Cleanup decisions** — Identify what's consuming the most space
+- **Monitoring** — Track growth over time with `--json` output
+- **Troubleshooting** — Find unexpectedly large directories
+
+**Relationship to Other Commands:**
+- Use `mc size` to **analyze** what's consuming space
+- Use `mc prune` to **clean up** Docker resources
+- Use `mc cleanup` to **remove** old sessions
+- Use `mc backup cleanup` to **remove** old backups
+
 ### `mc maintenance` 🆕
 Run comprehensive system maintenance — combines health checks, cleanup, backup verification, and Docker optimization
 ```bash

@@ -69,6 +69,7 @@ const { runQuickstart } = require('../lib/quickstart');
 const pruneCmd = require('../lib/prune');
 const { migrateProgram } = require('../lib/migrate');
 const apiCmd = require('../lib/api');
+const sizeCmd = require('../lib/size');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -78,7 +79,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.39.0')  // Feature: Added mc api command for API documentation management
+  .version('0.40.0')  // Feature: Added mc size command for disk usage analysis
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -168,6 +169,7 @@ program.addCommand(clientCmd);
 program.addCommand(pluginCmd);
 program.addCommand(disasterCmd);
 program.addCommand(pruneCmd);
+program.addCommand(sizeCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
