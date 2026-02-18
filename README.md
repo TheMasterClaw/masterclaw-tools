@@ -998,9 +998,26 @@ mc exec mc-core "htop" -i -t                 # Run htop interactively
 - Container whitelist — only MasterClaw containers can be targeted
 - Command injection prevention — dangerous characters blocked
 - Blocked commands — `rm`, `dd`, `mkfs`, `fdisk`, and other dangerous commands are blocked
+- **Resource limits** — fork bomb protection (max 128 processes), memory limits (1GB max), file descriptor limits
 - Rate limiting — 10 executions per minute (high-security command)
 - Audit logging — all executions logged for security review
 - Timeout protection — commands timeout after 5 minutes (30 min for interactive)
+
+**Resource Limits (Security Hardening):**
+The `mc exec` command automatically applies resource limits to prevent attacks:
+
+| Limit | Value | Purpose |
+|-------|-------|---------|
+| `nproc` | 128 soft / 256 hard | **Fork bomb protection** — prevents process exhaustion |
+| `nofile` | 1024 soft / 2048 hard | File descriptor limits — prevents resource exhaustion |
+| `memory` | 1GB hard limit | Memory exhaustion protection |
+| `memory-swap` | 1GB hard limit | Swap exhaustion protection |
+| `stack` | 8MB soft / 16MB hard | Stack overflow protection |
+
+To disable resource limits (emergency override):
+```bash
+MC_EXEC_NO_RESOURCE_LIMITS=1 mc exec mc-core "heavy-command"
+```
 
 **Allowed Containers:**
 - `mc-core` — AI brain (Python environment)

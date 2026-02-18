@@ -36,7 +36,10 @@ jest.mock('chalk', () => ({
 
 // Mock audit module
 jest.mock('../lib/audit', () => ({
-  logAuditEvent: jest.fn().mockResolvedValue(true),
+  logAudit: jest.fn().mockResolvedValue(true),
+  AuditEventType: {
+    DOCKER_EXEC: 'DOCKER_EXEC',
+  },
 }));
 
 // Mock child_process
@@ -393,7 +396,7 @@ describe('execInContainer Security', () => {
   });
 
   test('logs audit event on execution', async () => {
-    const { logAuditEvent } = require('../lib/audit');
+    const { logAudit } = require('../lib/audit');
     
     spawn.mockImplementation((cmd, args) => {
       if (cmd === 'docker' && args[0] === 'ps') {
@@ -408,7 +411,7 @@ describe('execInContainer Security', () => {
       workdir: '/app',
     });
 
-    expect(logAuditEvent).toHaveBeenCalledWith('container_exec', expect.objectContaining({
+    expect(logAudit).toHaveBeenCalledWith('DOCKER_EXEC', expect.objectContaining({
       container: 'mc-core',
       command: 'ls -la',
       workdir: '/app',
@@ -806,6 +809,145 @@ describe('Security Constants', () => {
     expect(BLOCKED_COMMANDS.has('mkfs.xfs')).toBe(true);
     expect(BLOCKED_COMMANDS.has('mkswap')).toBe(true);
     expect(BLOCKED_COMMANDS.has('parted')).toBe(true);
+  });
+});
+
+// =============================================================================
+// Resource Limits Tests (NEW - Security Hardening)
+// =============================================================================
+
+describe('RESOURCE_LIMITS Security Constants', () => {
+  const { RESOURCE_LIMITS, DISABLE_RESOURCE_LIMITS_ENV } = require('../lib/exec');
+
+  test('RESOURCE_LIMITS is defined with required properties', () => {
+    expect(RESOURCE_LIMITS).toBeDefined();
+    expect(typeof RESOURCE_LIMITS).toBe('object');
+  });
+
+  test('nproc limits are defined for fork bomb protection', () => {
+    expect(RESOURCE_LIMITS.nproc).toBeDefined();
+    expect(RESOURCE_LIMITS.nproc.soft).toBe(128);
+    expect(RESOURCE_LIMITS.nproc.hard).toBe(256);
+    expect(RESOURCE_LIMITS.nproc.description).toContain('fork bomb');
+  });
+
+  test('nofile limits are defined', () => {
+    expect(RESOURCE_LIMITS.nofile).toBeDefined();
+    expect(RESOURCE_LIMITS.nofile.soft).toBe(1024);
+    expect(RESOURCE_LIMITS.nofile.hard).toBe(2048);
+  });
+
+  test('memory limits are defined for resource exhaustion protection', () => {
+    expect(RESOURCE_LIMITS.memory).toBeDefined();
+    expect(RESOURCE_LIMITS.memory.soft).toBe(536870912); // 512MB
+    expect(RESOURCE_LIMITS.memory.hard).toBe(1073741824); // 1GB
+    expect(RESOURCE_LIMITS.memory.description).toContain('memory');
+  });
+
+  test('stack limits are defined', () => {
+    expect(RESOURCE_LIMITS.stack).toBeDefined();
+    expect(RESOURCE_LIMITS.stack.soft).toBe(8388608); // 8MB
+    expect(RESOURCE_LIMITS.stack.hard).toBe(16777216); // 16MB
+  });
+
+  test('DISABLE_RESOURCE_LIMITS_ENV constant is defined', () => {
+    expect(DISABLE_RESOURCE_LIMITS_ENV).toBe('MC_EXEC_NO_RESOURCE_LIMITS');
+  });
+});
+
+describe('execInContainer Resource Limit Enforcement', () => {
+  beforeEach(() => {
+    spawn.mockClear();
+    delete process.env.MC_EXEC_NO_RESOURCE_LIMITS;
+  });
+
+  afterEach(() => {
+    delete process.env.MC_EXEC_NO_RESOURCE_LIMITS;
+  });
+
+  test('applies resource limits by default', async () => {
+    spawn.mockImplementation((cmd, args) => {
+      if (cmd === 'docker' && args[0] === 'ps') {
+        return createMockProcess(0, 'mc-core');
+      }
+      return createMockProcess(0, '', '');
+    });
+
+    await execInContainer({
+      container: 'mc-core',
+      command: ['echo', 'test'],
+    });
+
+    // Find the docker exec call
+    const execCall = spawn.mock.calls.find(call => 
+      call[0] === 'docker' && call[1][0] === 'exec'
+    );
+    expect(execCall).toBeDefined();
+
+    const dockerArgs = execCall[1];
+
+    // Verify ulimit flags are present
+    expect(dockerArgs).toContain('--ulimit');
+    expect(dockerArgs).toContain('nproc=128:256');
+    expect(dockerArgs).toContain('nofile=1024:2048');
+    expect(dockerArgs).toContain('stack=8388608:16777216');
+
+    // Verify memory limits are present
+    expect(dockerArgs).toContain('--memory');
+    expect(dockerArgs).toContain('1073741824');
+    expect(dockerArgs).toContain('--memory-swap');
+  });
+
+  test('resource limits can be disabled via environment variable', async () => {
+    process.env.MC_EXEC_NO_RESOURCE_LIMITS = '1';
+
+    spawn.mockImplementation((cmd, args) => {
+      if (cmd === 'docker' && args[0] === 'ps') {
+        return createMockProcess(0, 'mc-core');
+      }
+      return createMockProcess(0, '', '');
+    });
+
+    await execInContainer({
+      container: 'mc-core',
+      command: ['echo', 'test'],
+    });
+
+    // Find the docker exec call
+    const execCall = spawn.mock.calls.find(call => 
+      call[0] === 'docker' && call[1][0] === 'exec'
+    );
+    expect(execCall).toBeDefined();
+
+    const dockerArgs = execCall[1];
+
+    // Verify resource limit flags are NOT present when disabled
+    expect(dockerArgs).not.toContain('--ulimit');
+    expect(dockerArgs).not.toContain('--memory');
+  });
+
+  test('resource limits are applied with interactive mode', async () => {
+    spawn.mockImplementation((cmd, args) => {
+      if (cmd === 'docker' && args[0] === 'ps') {
+        return createMockProcess(0, 'mc-core');
+      }
+      return createMockProcess(0);
+    });
+
+    await execInContainer({
+      container: 'mc-core',
+      command: ['sh'],
+      interactive: true,
+      tty: true,
+    });
+
+    const execCall = spawn.mock.calls.find(call => 
+      call[0] === 'docker' && call[1][0] === 'exec'
+    );
+
+    const dockerArgs = execCall[1];
+    expect(dockerArgs).toContain('--ulimit');
+    expect(dockerArgs).toContain('nproc=128:256');
   });
 });
 
