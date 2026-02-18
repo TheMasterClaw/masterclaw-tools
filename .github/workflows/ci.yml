@@ -32,3 +32,46 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=high --json > audit-report.json || true
+          if [ -s audit-report.json ]; then
+            echo "::warning::Security vulnerabilities found. Run 'npm audit' locally for details."
+            cat audit-report.json | jq -r '.vulnerabilities | to_entries[] | "\(.key): \(.value.severity)"' || true
+          fi
+        shell: bash
+
+      - name: Dependency Review (PR only)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: high
+
+      - name: Upload audit report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-report
+          path: audit-report.json
+          retention-days: 30

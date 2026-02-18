@@ -8,8 +8,11 @@
   },
   "scripts": {
     "test": "jest",
-    "lint": "eslint lib/ bin/"
-  },
+    "lint": "eslint lib/ bin/",
+    "security:audit": "npm audit --audit-level=high",
+    "security:fix": "npm audit fix",
+    "ci": "npm run lint && npm run security:audit && npm test"
+  },,
   "keywords": [
     "masterclaw",
     "cli",
