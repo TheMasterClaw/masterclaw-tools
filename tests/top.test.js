@@ -8,6 +8,7 @@ const {
   formatPercent,
   getContainerStats,
   getSystemStats,
+  validateInterval,
 } = require('../lib/top');
 
 // Mock child_process
@@ -81,6 +82,119 @@ describe('top.js - Container Resource Monitor', () => {
     });
   });
 
+  describe('validateInterval', () => {
+    // Security hardening tests for interval validation
+    
+    it('should accept valid intervals within bounds', () => {
+      const result = validateInterval('3');
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(3000);
+      expect(result.seconds).toBe(3);
+    });
+
+    it('should accept minimum valid interval (1 second)', () => {
+      const result = validateInterval('1');
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(1000);
+      expect(result.seconds).toBe(1);
+    });
+
+    it('should accept maximum valid interval (300 seconds)', () => {
+      const result = validateInterval('300');
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(300000);
+      expect(result.seconds).toBe(300);
+    });
+
+    it('should accept float intervals', () => {
+      const result = validateInterval('1.5');
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(1500);
+      expect(result.seconds).toBe(1.5);
+    });
+
+    it('should reject intervals below minimum (security: prevent DoS)', () => {
+      const result = validateInterval('0.5');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too short');
+      expect(result.error).toContain('Minimum allowed is 1');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject zero interval (security: prevent DoS)', () => {
+      const result = validateInterval('0');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too short');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject negative intervals', () => {
+      const result = validateInterval('-5');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too short');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject intervals above maximum', () => {
+      const result = validateInterval('301');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too long');
+      expect(result.error).toContain('Maximum allowed is 300');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject invalid strings', () => {
+      const result = validateInterval('abc');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid interval');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject empty strings', () => {
+      const result = validateInterval('');
+      expect(result.valid).toBe(false);
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject null values', () => {
+      const result = validateInterval(null);
+      expect(result.valid).toBe(false);
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject undefined values', () => {
+      const result = validateInterval(undefined);
+      expect(result.valid).toBe(false);
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject Infinity', () => {
+      const result = validateInterval('Infinity');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('finite number');
+      expect(result.value).toBe(3000);
+    });
+
+    it('should reject negative Infinity', () => {
+      const result = validateInterval('-Infinity');
+      expect(result.valid).toBe(false);
+      expect(result.value).toBe(3000);
+    });
+
+    it('should handle number input (not string)', () => {
+      const result = validateInterval(5);
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(5000);
+      expect(result.seconds).toBe(5);
+    });
+
+    it('should round milliseconds correctly', () => {
+      const result = validateInterval('1.234');
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(1234);
+    });
+  });
+
   describe('getSystemStats', () => {
     it('should parse docker system df output', () => {
       const mockOutput = `Images|45|8.5GB
@@ -122,7 +236,6 @@ Build Cache|0|0B`;
 
   describe('getContainerStats', () => {
     it('should return stats for all services', () => {
-      // Mock inspect calls
       execSync.mockImplementation((cmd) => {
         if (cmd.includes('docker inspect') && cmd.includes('State.Status')) {
           return 'running|healthy|masterclaw/core:latest';
@@ -141,7 +254,6 @@ Build Cache|0|0B`;
       expect(stats).toBeInstanceOf(Array);
       expect(stats.length).toBeGreaterThan(0);
       
-      // Check structure of first stat
       const first = stats[0];
       expect(first).toHaveProperty('name');
       expect(first).toHaveProperty('display');

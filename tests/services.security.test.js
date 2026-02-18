@@ -9,6 +9,8 @@ const {
   MAX_HTTP_TIMEOUT,
   MAX_PS_LINES,
   MAX_OUTPUT_BUFFER_SIZE,
+  COMPOSE_TIMEOUT_MS,
+  COMPOSE_MAX_BUFFER_SIZE,
   validateServiceName,
   validateServiceNames,
   checkService,
@@ -235,6 +237,41 @@ describe('runDockerCompose security', () => {
 
     await Promise.all(validCalls);
   });
+
+  test('accepts custom timeout option', async () => {
+    // Should pass validation with custom timeout (will fail on execution since docker-compose may not exist)
+    await expect(runDockerCompose(['ps'], '/tmp', { timeout: 1000 }))
+      .rejects.not.toBeInstanceOf(DockerSecurityError);
+  });
+});
+
+// =============================================================================
+// runDockerCompose Timeout and Buffer Tests
+// =============================================================================
+
+describe('runDockerCompose timeout and buffer protection', () => {
+  test('exports COMPOSE_TIMEOUT_MS constant', () => {
+    expect(COMPOSE_TIMEOUT_MS).toBeDefined();
+    expect(typeof COMPOSE_TIMEOUT_MS).toBe('number');
+    expect(COMPOSE_TIMEOUT_MS).toBe(5 * 60 * 1000); // 5 minutes default
+  });
+
+  test('exports COMPOSE_MAX_BUFFER_SIZE constant', () => {
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBeDefined();
+    expect(typeof COMPOSE_MAX_BUFFER_SIZE).toBe('number');
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBe(10 * 1024 * 1024); // 10MB default
+  });
+
+  test('accepts valid timeout options', async () => {
+    // Should accept valid timeout values without security errors
+    const validTimeouts = [1000, 5000, 30000, 60000, 300000];
+
+    for (const timeout of validTimeouts) {
+      // Will fail on execution but not on validation
+      await expect(runDockerCompose(['ps'], '/tmp', { timeout }))
+        .rejects.not.toBeInstanceOf(DockerSecurityError);
+    }
+  });
 });
 
 // =============================================================================
@@ -318,6 +355,20 @@ describe('Security Constants', () => {
     expect(MAX_HTTP_TIMEOUT).toBe(10000); // 10 seconds
     expect(MAX_HTTP_TIMEOUT).toBeGreaterThan(0);
     expect(MAX_HTTP_TIMEOUT).toBeLessThanOrEqual(60000); // Max 60 seconds
+  });
+
+  test('COMPOSE_TIMEOUT_MS is defined with reasonable value', () => {
+    expect(COMPOSE_TIMEOUT_MS).toBeDefined();
+    expect(COMPOSE_TIMEOUT_MS).toBe(5 * 60 * 1000); // 5 minutes
+    expect(COMPOSE_TIMEOUT_MS).toBeGreaterThan(60000); // At least 1 minute
+    expect(COMPOSE_TIMEOUT_MS).toBeLessThanOrEqual(10 * 60 * 1000); // Max 10 minutes
+  });
+
+  test('COMPOSE_MAX_BUFFER_SIZE is defined with reasonable value', () => {
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBeDefined();
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBe(10 * 1024 * 1024); // 10MB
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBeGreaterThan(1024 * 1024); // At least 1MB
+    expect(COMPOSE_MAX_BUFFER_SIZE).toBeLessThanOrEqual(100 * 1024 * 1024); // Max 100MB
   });
 });
 

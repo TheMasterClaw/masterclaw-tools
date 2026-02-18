@@ -558,8 +558,11 @@ describe('Edge Cases', () => {
   });
 
   test('should handle mixed successes and failures', () => {
-    const cb = new CircuitBreaker('test', { failureThreshold: 5 });
-    
+    const cb = new CircuitBreaker('test', {
+      failureThreshold: 5,
+      minCallsBeforeCalculation: 100, // Disable error rate check for this test
+    });
+
     // Pattern: success, fail, success, fail...
     for (let i = 0; i < 10; i++) {
       if (i % 2 === 0) {
@@ -568,10 +571,11 @@ describe('Edge Cases', () => {
         cb.recordFailure(new Error(`Error ${i}`));
       }
     }
-    
+
     // Should not open because consecutive failures never reached threshold
     expect(cb.state).toBe(CircuitState.CLOSED);
-    expect(cb.consecutiveFailures).toBe(0); // Reset by last success
+    // After alternating pattern ending with failure (i=9), consecutiveFailures should be 1
+    expect(cb.consecutiveFailures).toBe(1);
   });
 
   test('should handle undefined error in recordFailure', () => {
