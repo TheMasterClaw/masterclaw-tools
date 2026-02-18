@@ -1327,6 +1327,57 @@ mc config reset --force                  # Skip confirmation
 }
 ```
 
+### `mc export` 🆕
+Export data from MasterClaw for backup and migration (complements `mc import`)
+```bash
+# Export everything
+mc export all                              # Export all data with auto-generated filename
+mc export all ./backup.json                # Export to specific file
+mc export all ./backup.json --no-mask      # Include unmasked sensitive values (caution!)
+mc export all ./backup.json --include-messages  # Include full session message history
+
+# Export specific data types
+mc export config ./config.json             # Export configuration only
+mc export config --no-mask                 # Export config without masking secrets
+mc export memory ./memories.json           # Export memories
+mc export memory ./memories.json --limit 500    # Limit number of memories
+mc export sessions ./sessions.json         # Export sessions
+mc export sessions ./sessions.json --include-messages  # Include full message history
+```
+
+**Export Types:**
+- **all** — Complete export with config, memories, and sessions
+- **config** — Configuration settings only (masked by default)
+- **memory** — Memory/vector data only
+- **sessions** — Session data (with optional message history)
+
+**Options:**
+- `--no-mask` — Do not mask sensitive values like tokens and API keys (security risk)
+- `--limit <n>` — Maximum items to export (default: 1000)
+- `--include-messages` — Include full chat history for each session
+- `--pretty` — Pretty-print JSON output (default: true)
+
+**Security:**
+- Sensitive values (tokens, API keys, passwords) are automatically masked
+- Use `--no-mask` only when necessary and store exports securely
+- Exported files should be treated as sensitive data
+
+**Examples:**
+```bash
+# Full backup with timestamp
+mc export all
+# Creates: masterclaw-export-2025-02-18T02-50-00-000Z.json
+
+# Export config for migration (masked)
+mc export config ./config-backup.json
+
+# Export memories with limit
+mc export memory ./memories.json --limit 100
+
+# Pipe to another command
+mc export config | jq '.gateway.url'
+```
+
 ### `mc import`
 Import data from export files (complements `mc export`)
 ```bash

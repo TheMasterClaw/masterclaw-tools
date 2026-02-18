@@ -29,6 +29,7 @@ const backup = require('../lib/backup');
 const cleanup = require('../lib/cleanup');
 const completion = require('../lib/completion');
 const importer = require('../lib/import');
+const exporter = require('../lib/export');
 const deps = require('../lib/deps');
 const cost = require('../lib/cost');
 const env = require('../lib/env');
@@ -63,7 +64,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.25.0')  // Security: Added input validation, retry logic, and correlation ID to performance module
+  .version('0.26.0')  // Feature: Added unified mc export command for config, memories, sessions, and full system export
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -128,6 +129,7 @@ program.addCommand(restore);
 program.addCommand(cleanup);
 program.addCommand(completion);
 program.addCommand(importer);
+program.addCommand(exporter);
 program.addCommand(deps);
 program.addCommand(cost);
 program.addCommand(ssl);
