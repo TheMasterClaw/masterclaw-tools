@@ -72,6 +72,7 @@ const apiCmd = require('../lib/api');
 const sizeCmd = require('../lib/size');
 const { workflowCmd } = require('../lib/workflow');
 const dashboardCmd = require('../lib/dashboard');
+const webhookCmd = require('../lib/webhook');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -81,7 +82,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.42.0')  // Feature: Added mc dashboard command to open monitoring dashboards
+  .version('0.43.0')  // Feature: Added mc webhook command for GitHub webhook management
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -174,6 +175,7 @@ program.addCommand(pruneCmd);
 program.addCommand(sizeCmd);
 program.addCommand(workflowCmd);
 program.addCommand(dashboardCmd);
+program.addCommand(webhookCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
