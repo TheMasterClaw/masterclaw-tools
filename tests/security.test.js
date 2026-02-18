@@ -305,10 +305,182 @@ describe('Security Module', () => {
       expect(security.safeJsonParse('{"incomplete"')).toBeNull();
     });
 
-    test('enforces depth limit', () => {
+    test('returns null for non-string input', () => {
+      expect(security.safeJsonParse(null)).toBeNull();
+      expect(security.safeJsonParse(undefined)).toBeNull();
+      expect(security.safeJsonParse(123)).toBeNull();
+      expect(security.safeJsonParse({})).toBeNull();
+      expect(security.safeJsonParse([])).toBeNull();
+    });
+
+    test('enforces depth limit correctly', () => {
+      // Depth 5: {"a":{"b":{"c":{"d":{"e":"deep"}}}}}
       const deepObject = JSON.stringify({ a: { b: { c: { d: { e: 'deep' } } } } });
       expect(security.safeJsonParse(deepObject, 3)).toBeNull();
+      expect(security.safeJsonParse(deepObject, 4)).toBeNull();
+      expect(security.safeJsonParse(deepObject, 5)).toEqual({ a: { b: { c: { d: { e: 'deep' } } } } });
       expect(security.safeJsonParse(deepObject, 10)).toEqual({ a: { b: { c: { d: { e: 'deep' } } } } });
+    });
+
+    test('enforces depth limit for arrays', () => {
+      const deepArray = JSON.stringify([[[[[1]]]]]);
+      expect(security.safeJsonParse(deepArray, 3)).toBeNull();
+      expect(security.safeJsonParse(deepArray, 5)).toEqual([[[[[1]]]]]);
+    });
+
+    test('enforces maximum input size', () => {
+      const hugeString = '{"' + 'x'.repeat(security.MAX_JSON_STRING_LENGTH) + '":1}';
+      expect(security.safeJsonParse(hugeString)).toBeNull();
+    });
+
+    test('prevents prototype pollution via __proto__', () => {
+      const malicious = '{"__proto__":{"polluted":true}}';
+      const result = security.safeJsonParse(malicious);
+      expect(result).toBeNull();
+    });
+
+    test('prevents prototype pollution via constructor', () => {
+      const malicious = '{"constructor":{"prototype":{"polluted":true}}}';
+      const result = security.safeJsonParse(malicious);
+      expect(result).toBeNull();
+    });
+
+    test('prevents prototype pollution via prototype property', () => {
+      const malicious = '{"prototype":{"polluted":true}}';
+      const result = security.safeJsonParse(malicious);
+      expect(result).toBeNull();
+    });
+
+    test('allows prototype keys when explicitly permitted', () => {
+      const malicious = '{"__proto__":{"allowed":true}}';
+      const result = security.safeJsonParse(malicious, 100, true);
+      expect(result.__proto__).toEqual({ allowed: true });
+    });
+
+    test('handles deeply nested malicious objects with prototype pollution', () => {
+      // Raw JSON string with __proto__ as a key (not using JSON.stringify)
+      const malicious = '{"a":{"__proto__":{"injected":true},"b":{"c":"value"}}}';
+      const result = security.safeJsonParse(malicious);
+      // Since __proto__ is detected anywhere in the JSON, the whole thing is rejected
+      expect(result).toBeNull();
+    });
+
+    test('handles strings containing braces correctly', () => {
+      const json = '{"msg":"Hello {world}!","code":"{123}"}';
+      const result = security.safeJsonParse(json);
+      expect(result).toEqual({ msg: 'Hello {world}!', code: '{123}' });
+    });
+
+    test('handles escaped quotes correctly', () => {
+      const json = '{"msg":"She said \\"Hello\\" to me"}';
+      const result = security.safeJsonParse(json);
+      expect(result).toEqual({ msg: 'She said "Hello" to me' });
+    });
+
+    test('handles empty objects and arrays', () => {
+      expect(security.safeJsonParse('{}')).toEqual({});
+      expect(security.safeJsonParse('[]')).toEqual([]);
+    });
+
+    test('handles null and primitive values', () => {
+      expect(security.safeJsonParse('null')).toBeNull();
+      expect(security.safeJsonParse('42')).toBe(42);
+      expect(security.safeJsonParse('"string"')).toBe('string');
+      expect(security.safeJsonParse('true')).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Safe JSON Helper Tests
+  // ===========================================================================
+  describe('getJsonDepth', () => {
+    test('calculates depth for simple objects', () => {
+      expect(security.getJsonDepth('{}')).toBe(1);
+      expect(security.getJsonDepth('{"a":1}')).toBe(1);
+      expect(security.getJsonDepth('{"a":{"b":1}}')).toBe(2);
+      expect(security.getJsonDepth('{"a":{"b":{"c":1}}}')).toBe(3);
+    });
+
+    test('calculates depth for nested arrays', () => {
+      expect(security.getJsonDepth('[]')).toBe(1);
+      expect(security.getJsonDepth('[1,2,3]')).toBe(1);
+      expect(security.getJsonDepth('[[1]]')).toBe(2);
+      expect(security.getJsonDepth('[[[1,2],[3,4]]]')).toBe(3);
+    });
+
+    test('calculates depth for mixed structures', () => {
+      expect(security.getJsonDepth('{"a":[1,2]}')).toBe(2);
+      expect(security.getJsonDepth('[{"a":{"b":1}}]')).toBe(3);
+      // {"a":[{"b":[{"c":1}}]}]} - outer obj(1) > a(1) > array(2) > obj(3) > b(3) > array(4) > obj(5)
+      expect(security.getJsonDepth('{"a":[{"b":[{"c":1}]}]}')).toBe(5);
+    });
+
+    test('ignores braces inside strings', () => {
+      expect(security.getJsonDepth('{"msg":"{not nested}"}')).toBe(1);
+      expect(security.getJsonDepth('{"a":"{b:{c}}"}')).toBe(1);
+      expect(security.getJsonDepth('{"a":{"b":"[not array]"}}')).toBe(2);
+    });
+
+    test('handles escaped quotes correctly', () => {
+      expect(security.getJsonDepth('{"a":"Say \\"hello\\" to {me}"}')).toBe(1);
+    });
+
+    test('returns 0 for empty string', () => {
+      expect(security.getJsonDepth('')).toBe(0);
+    });
+
+    test('handles complex nested structures', () => {
+      const complex = JSON.stringify({
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                level5: 'deep'
+              }
+            }
+          }
+        }
+      });
+      expect(security.getJsonDepth(complex)).toBe(5);
+    });
+  });
+
+  describe('hasProtoPollutionKeys', () => {
+    test('detects __proto__ key', () => {
+      expect(security.hasProtoPollutionKeys('{"__proto__":{"polluted":true}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"a":{"__proto__":{}}}')).toBe(true);
+    });
+
+    test('detects constructor key', () => {
+      expect(security.hasProtoPollutionKeys('{"constructor":{"prototype":{}}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"a":{"constructor":{}}}')).toBe(true);
+    });
+
+    test('detects prototype key', () => {
+      expect(security.hasProtoPollutionKeys('{"prototype":{"polluted":true}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"a":{"prototype":{}}}')).toBe(true);
+    });
+
+    test('is case insensitive', () => {
+      expect(security.hasProtoPollutionKeys('{"__PROTO__":{}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"Constructor":{}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"PROTOTYPE":{}}')).toBe(true);
+    });
+
+    test('ignores keys in string values', () => {
+      expect(security.hasProtoPollutionKeys('{"msg":"__proto__ is not a key here"}')).toBe(false);
+      expect(security.hasProtoPollutionKeys('{"data":"constructor string"}')).toBe(false);
+    });
+
+    test('allows safe JSON without dangerous keys', () => {
+      expect(security.hasProtoPollutionKeys('{"key":"value"}')).toBe(false);
+      expect(security.hasProtoPollutionKeys('[1,2,3]')).toBe(false);
+      expect(security.hasProtoPollutionKeys('{"__proto_safe__":true}')).toBe(false);
+    });
+
+    test('handles whitespace around keys', () => {
+      expect(security.hasProtoPollutionKeys('{"__proto__" : {"polluted":true}}')).toBe(true);
+      expect(security.hasProtoPollutionKeys('{"constructor"  :  {}}')).toBe(true);
     });
   });
 
@@ -347,6 +519,33 @@ describe('Security Module', () => {
       obj.b = obj;
       // Should not throw, should return error object
       expect(security.safeJsonStringify(obj)).toContain('[Circular]');
+    });
+  });
+
+  // ===========================================================================
+  // Security Constants Tests
+  // ===========================================================================
+  describe('Security Constants', () => {
+    test('MAX_SAFE_LOG_LENGTH is defined', () => {
+      expect(security.MAX_SAFE_LOG_LENGTH).toBe(10000);
+    });
+
+    test('MAX_JSON_STRING_LENGTH is defined', () => {
+      expect(security.MAX_JSON_STRING_LENGTH).toBe(10 * 1024 * 1024);
+    });
+
+    test('LOG_INJECTION_CHARS is defined', () => {
+      expect(security.LOG_INJECTION_CHARS).toBeInstanceOf(RegExp);
+    });
+
+    test('LOG_NEWLINE_CHARS is defined', () => {
+      expect(security.LOG_NEWLINE_CHARS).toBeInstanceOf(RegExp);
+    });
+
+    test('DANGEROUS_PROTO_KEYS contains expected keys', () => {
+      expect(security.DANGEROUS_PROTO_KEYS).toContain('__proto__');
+      expect(security.DANGEROUS_PROTO_KEYS).toContain('constructor');
+      expect(security.DANGEROUS_PROTO_KEYS).toContain('prototype');
     });
   });
 });
