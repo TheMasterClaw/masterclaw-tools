@@ -56,6 +56,9 @@ const { getAllCircuitStatus, resetAllCircuits, CircuitState } = require('../lib/
 const { secretsCmd } = require('../lib/secrets');
 const contextCmd = require('../lib/context');
 const performance = require('../lib/performance');
+const { aliasCmd } = require('../lib/alias');
+const { metricsCmd } = require('../lib/metrics');
+const { topCmd } = require('../lib/top');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -65,7 +68,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.26.0')  // Feature: Added unified mc export command for config, memories, sessions, and full system export
+  .version('0.29.0')  // Feature: Added mc top command for real-time container resource monitoring
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -144,6 +147,9 @@ program.addCommand(envCmd);
 program.addCommand(maintenance);
 program.addCommand(configCmd);
 program.addCommand(secretsCmd);
+program.addCommand(aliasCmd);
+program.addCommand(metricsCmd);
+program.addCommand(topCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing

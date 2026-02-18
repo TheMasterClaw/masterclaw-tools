@@ -373,6 +373,81 @@ mc info              # Pretty-printed system overview
 mc info --json       # Machine-readable JSON output
 ```
 
+### `mc alias` 🆕
+Manage command aliases and shortcuts for faster CLI operations. Create custom shortcuts for frequently used commands.
+
+```bash
+# List all aliases
+mc alias list              # Show all aliases and shortcuts
+mc alias list --json       # Output as JSON
+
+# Execute an alias
+mc alias run <name>        # Execute an alias or shortcut
+mc alias run s             # Example: runs 'mc status'
+
+# Add new aliases
+mc alias add <name> <command>     # Add a command alias
+mc alias add st "status"          # Now 'mc alias run st' runs 'mc status'
+mc alias add bk "backup --cloud"  # Alias with arguments
+mc alias add deploy-prod "deploy rolling" --shortcut  # Add shell shortcut
+
+# Manage aliases
+mc alias show <name>       # Show alias details
+mc alias remove <name>     # Remove an alias
+mc alias export [file]     # Export aliases to JSON
+mc alias import <file>     # Import aliases from JSON
+mc alias import <file> --merge  # Merge with existing aliases
+mc alias reset --force     # Reset to defaults
+```
+
+**Default Aliases:**
+| Alias | Command | Description |
+|-------|---------|-------------|
+| `s` | `status` | Quick status check |
+| `st` | `status` | Alternative status alias |
+| `l` | `logs` | View logs |
+| `log` | `logs` | Alternative logs alias |
+| `b` | `backup` | Create backup |
+| `bk` | `backup` | Alternative backup alias |
+| `r` | `revive` | Start services |
+| `u` | `update` | Update images |
+| `d` | `deploy` | Deployment commands |
+| `cfg` | `config` | Configuration management |
+| `ex` | `exec` | Execute in containers |
+| `ev` | `events` | Event tracking |
+| `nt` | `notify` | Notification settings |
+| `perf` | `performance` | Performance metrics |
+| `sm` | `smoke-test` | Run smoke tests |
+| `val` | `validate` | Validate environment |
+
+**Default Shortcuts:**
+| Shortcut | Command | Description |
+|----------|---------|-------------|
+| `deploy` | `cd /opt/masterclaw-infrastructure && ./scripts/deploy.sh` | Full deployment |
+| `logs-backend` | `mc logs mc-backend --follow` | Follow backend logs |
+| `logs-core` | `mc logs mc-core --follow` | Follow core logs |
+| `logs-gateway` | `mc logs mc-gateway --follow` | Follow gateway logs |
+| `quick-status` | `mc status --compact` | Quick status |
+| `full-backup` | `mc backup && mc backup-cloud` | Backup + cloud upload |
+| `health-watch` | `mc health --watch` | Watch health continuously |
+
+**Examples:**
+```bash
+# Add custom alias for quick deploy check
+mc alias add quick-check "smoke-test --quick"
+
+# Add shell shortcut for custom workflow
+mc alias add my-deploy "cd /opt/masterclaw && make prod && mc smoke-test" --shortcut
+
+# Export aliases for backup
+mc alias export ~/mc-aliases-backup.json
+
+# Import aliases on new machine
+mc alias import ~/mc-aliases-backup.json
+```
+
+Aliases are stored in `~/.openclaw/workspace/rex-deus/config/aliases.json` and integrate with rex-deus for personalized command shortcuts.
+
 ### `mc notify` 🆕
 Manage alert notifications across multiple channels (WhatsApp, Discord, Slack, Telegram).
 Configure, test, and monitor alerts for service downtime, SSL expiration, costs, and security threats.
@@ -686,6 +761,163 @@ Environment variables (in Core):
 - `PERF_SLOW_THRESHOLD_MS` — Slow request threshold (default: 1000ms)
 - `PERF_MAX_PROFILES` — Maximum profiles to store (default: 10000)
 - `PERF_ENABLED` — Enable/disable profiling (default: true)
+
+### `mc metrics` 🆕
+View system metrics and performance data without needing Grafana access. Quickly monitor request rates, error rates, LLM costs, and system health from the command line.
+
+```bash
+# Show current metrics summary
+mc metrics
+
+# Watch mode - continuously updating
+mc metrics --watch
+mc metrics --watch --interval 10  # Update every 10 seconds
+
+# Output as JSON for scripting
+mc metrics --json
+
+# Export metrics to file
+mc metrics --export
+mc metrics --export --output ./metrics-$(date +%Y%m%d).json
+
+# Compare with previous metrics
+mc metrics --compare
+```
+
+**Metrics Displayed:**
+| Metric | Description |
+|--------|-------------|
+| **Health Score** | Overall system health (0-100) based on error rate and response times |
+| **Request Rate** | Requests per second |
+| **Error Rate** | Percentage of failed requests |
+| **Response Times** | Average and P95 response times |
+| **LLM Metrics** | Total calls, rate, and accumulated costs |
+| **Memory & Sessions** | Active memory entries and sessions |
+| **System Resources** | CPU, memory, and disk usage (if node_exporter available) |
+
+**Example Output:**
+```
+🐾 MasterClaw Metrics
+   2/18/2026, 6:15:30 AM
+
+Sources: Prometheus, Core API
+
+✅ Health Score: 95/100
+
+📊 Request Metrics
+──────────────────────────────────────────────────
+  Total Requests: 15.2k
+  Request Rate:   25.50 req/s ↑ 5%
+  Error Rate:     1.2%
+  Avg Response:   245ms
+  P95 Response:   520ms
+
+🤖 LLM Metrics
+──────────────────────────────────────────────────
+  Total LLM Calls: 500
+  LLM Rate:        2.50 calls/s
+  Total Cost:      $12.50
+
+💾 Memory & Sessions
+──────────────────────────────────────────────────
+  Memory Entries:  2,500
+  Active Sessions: 15
+```
+
+**Data Sources:**
+1. **Prometheus** (preferred) — Rich metrics from monitoring stack
+2. **Core API** (fallback) — Basic metrics from `/metrics` endpoint
+
+**Environment Variables:**
+- `PROMETHEUS_URL` — Prometheus endpoint (default: http://localhost:9090)
+- `CORE_URL` — Core API endpoint (default: http://localhost:8000)
+
+**Exit Codes:**
+- `0` — Metrics collected successfully
+- `1` — Rate limit exceeded
+- `4` — No metrics sources available
+
+### `mc top` 🆕
+Real-time container resource monitor — like `htop` but for MasterClaw services. Watch CPU, memory, network I/O, and container health in an auto-updating display.
+
+```bash
+# Start interactive resource monitor (watch mode)
+mc top
+
+# Single snapshot, no refresh
+mc top --once
+
+# Custom refresh interval
+mc top --interval 5
+
+# Output as JSON for scripting
+mc top --json
+
+# Export to file
+mc top --export stats.json
+```
+
+**Display Columns:**
+| Column | Description |
+|--------|-------------|
+| **Container** | Service name (traefik, core, backend, etc.) |
+| **Status** | Running state and health (healthy/unhealthy) |
+| **CPU** | CPU usage percentage with trend indicator |
+| **Memory** | Current memory usage |
+| **Mem%** | Memory usage as percentage of container limit |
+| **Net In/Out** | Network I/O since container started |
+| **PIDs** | Number of processes in container |
+| **Uptime** | How long container has been running |
+
+**Example Output:**
+```
+🐾 MasterClaw Resource Monitor
+   2/18/2026, 6:20:15 AM
+
+📱 App Services
+────────────────────────────────────────────────────────────────────────────────────
+  core         healthy    12.5%    850 MB     42%      12 MB      45 MB     15     2d
+  backend      healthy     3.2%    420 MB     21%       8 MB      23 MB      8     2d
+  interface    healthy     0.1%     85 MB      4%       2 MB       5 MB      5     2d
+  gateway      healthy     2.1%    156 MB      8%       5 MB      12 MB      7     2d
+
+💾 Data
+────────────────────────────────────────────────────────────────────────────────────
+  chroma       healthy     8.7%    1.2 GB     35%     156 MB     234 MB     12     2d
+
+🔧 Infrastructure
+────────────────────────────────────────────────────────────────────────────────────
+  traefik      healthy     1.2%     45 MB      2%       1 MB       3 MB      7     2d
+  watchtower   healthy     0.5%     32 MB      2%       0 B        1 MB      5     2d
+
+📊 Monitoring
+────────────────────────────────────────────────────────────────────────────────────
+  grafana      healthy     2.3%    156 MB      7%       2 MB       8 MB      9     2d
+  prometheus   healthy     4.1%    890 MB     22%      45 MB     156 MB     11     2d
+
+📦 Docker System
+──────────────────────────────────────────────────
+  Containers: 10 (2.1GB)
+  Images: 45 (8.5GB)
+  Volumes: 12 (500MB)
+
+Press Ctrl+C to exit | Refreshing every 3s
+```
+
+**Features:**
+- **Categorized view** — Services grouped by type (App, Data, Infrastructure, Monitoring)
+- **Color coding** — CPU and memory usage colors indicate severity (green/yellow/red)
+- **Trend indicators** — Arrows show CPU usage trending up/down vs previous sample
+- **Health indicators** — ● green for healthy, red for unhealthy, yellow for unknown
+- **Auto-refresh** — Live updates every 3 seconds (configurable)
+- **JSON export** — Scriptable output for automation and monitoring
+
+**Keyboard Shortcuts:**
+- `Ctrl+C` — Exit watch mode
+
+**Exit Codes:**
+- `0` — Normal exit
+- `1` — Rate limit exceeded
 
 ### `mc validate`
 Pre-flight environment validation before deployment
