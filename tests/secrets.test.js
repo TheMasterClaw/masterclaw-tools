@@ -504,7 +504,7 @@ describe('Encryption at Rest', () => {
     });
     
     it('should decrypt secrets when retrieved', async () => {
-      const originalValue = 'sk-openai-api-key-test-12345' + 'a'.repeat(27); // Make it 48 chars
+      const originalValue = 'sk-' + 'a'.repeat(48); // Valid OpenAI API key format
       await setSecret('OPENAI_API_KEY', originalValue);
       
       const retrieved = await getSecret('OPENAI_API_KEY');
@@ -516,7 +516,7 @@ describe('Encryption at Rest', () => {
       const secrets = {
         GATEWAY_TOKEN: 'mc_token_12345678',
         OPENAI_API_KEY: 'sk-' + 'a'.repeat(48),
-        ANTHROPIC_API_KEY: 'sk-ant-api-key-test123' + 'b'.repeat(10),
+        ANTHROPIC_API_KEY: 'sk-ant-' + 'b'.repeat(32),
       };
       
       for (const [key, value] of Object.entries(secrets)) {

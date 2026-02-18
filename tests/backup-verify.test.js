@@ -40,8 +40,14 @@ jest.mock('../lib/docker', () => ({
 }));
 
 jest.mock('../lib/audit', () => ({
-  logAuditEvent: jest.fn().mockResolvedValue(true),
+  logAudit: jest.fn().mockResolvedValue(true),
   logSecurityViolation: jest.fn().mockResolvedValue(true),
+  AuditEventType: {
+    BACKUP_RESTORE: 'BACKUP_RESTORE',
+    BACKUP_CREATE: 'BACKUP_CREATE',
+    SECURITY_VIOLATION: 'SECURITY_VIOLATION',
+    CONFIG_READ: 'CONFIG_READ',
+  },
 }));
 
 // Mock fs-extra
@@ -321,8 +327,8 @@ describe('Backup Verify Module', () => {
       setTimeout(() => {
         const closeHandler = mockProcess.on.mock.calls.find(
           call => call[0] === 'close'
-        )[1];
-        closeHandler(0);
+        )?.[1];
+        if (closeHandler) closeHandler(0);
       }, 10);
 
       const result = await backupVerify.executeBackupVerify({ latest: true });
@@ -344,8 +350,8 @@ describe('Backup Verify Module', () => {
       setTimeout(() => {
         const closeHandler = mockProcess.on.mock.calls.find(
           call => call[0] === 'close'
-        )[1];
-        closeHandler(1);
+        )?.[1];
+        if (closeHandler) closeHandler(1);
       }, 10);
 
       await expect(backupVerify.executeBackupVerify({}))
@@ -370,8 +376,8 @@ describe('Backup Verify Module', () => {
       setTimeout(() => {
         const closeHandler = mockProcess.on.mock.calls.find(
           call => call[0] === 'close'
-        )[1];
-        closeHandler(2);
+        )?.[1];
+        if (closeHandler) closeHandler(2);
       }, 10);
 
       await expect(backupVerify.executeBackupVerify({}))
@@ -396,8 +402,8 @@ describe('Backup Verify Module', () => {
       setTimeout(() => {
         const errorHandler = mockProcess.on.mock.calls.find(
           call => call[0] === 'error'
-        )[1];
-        errorHandler(new Error('Spawn failed'));
+        )?.[1];
+        if (errorHandler) errorHandler(new Error('Spawn failed'));
       }, 10);
 
       await expect(backupVerify.executeBackupVerify({}))
@@ -420,8 +426,8 @@ describe('Backup Verify Module', () => {
       setTimeout(() => {
         const timeoutHandler = mockProcess.on.mock.calls.find(
           call => call[0] === 'timeout'
-        )[1];
-        timeoutHandler();
+        )?.[1];
+        if (timeoutHandler) timeoutHandler();
       }, 10);
 
       await expect(backupVerify.executeBackupVerify({}))
