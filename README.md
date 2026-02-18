@@ -1879,6 +1879,83 @@ Once synced, the AI can reference this context in conversations:
 - MasterClaw Core must be running with memory support
 - API connection to Core (configured via `mc config`)
 
+### `mc contacts` 🆕
+Manage personal and professional contacts in rex-deus. Store contact information securely with structured data, search capabilities, and notification integration.
+
+```bash
+# List contacts
+mc contacts list                           # Show all contacts
+mc contacts list --category professional   # Filter by category
+mc contacts list --tag urgent              # Filter by tag
+mc contacts list --search "John"           # Search by name
+mc contacts list --json                    # Output as JSON
+
+# View contact details
+mc contacts show "John Doe"                # Show full contact details
+mc contacts show "John Doe" --reveal       # Show unmasked contact values
+
+# Manage contacts
+mc contacts add                            # Interactive add contact
+mc contacts add --name "Jane" --category technical --role "DevOps"
+mc contacts remove "John Doe"              # Remove a contact
+mc contacts remove "John Doe" --force      # Skip confirmation
+
+# Export contacts
+mc contacts export                         # Export to contacts-backup.json
+mc contacts export --format csv            # Export as CSV
+mc contacts export --format vcard          # Export as vCard
+mc contacts export -o my-contacts.json     # Custom output file
+
+# Statistics
+mc contacts stats                          # Show contact statistics
+```
+
+**Contact Categories:**
+| Category | Icon | Use For |
+|----------|------|---------|
+| `personal` | 👤 | Friends, family |
+| `professional` | 💼 | Colleagues, business contacts |
+| `technical` | 🔧 | Technical support, developers |
+| `services` | 🏢 | Hosting, domains, vendors |
+| `emergency` | 🚨 | Critical contacts |
+
+**Contact Methods Supported:**
+- Email, Phone, WhatsApp, Signal, Telegram
+- Discord, Slack, Twitter, GitHub
+- Website, Other
+
+**Security:**
+- Contacts stored in rex-deus (private repository)
+- Sensitive values masked by default (e.g., `+1*****5678` for phone)
+- Secure file permissions (0o600)
+- Audit logging for all modifications
+- Exportable to JSON/CSV/vCard
+
+**Integration with Notifications:**
+```bash
+# Get notification info for a contact
+mc contacts notify-info "John Doe"         # Returns best contact method
+
+# Used internally by:
+mc notify send --contact "John Doe"        # Send notification to contact
+```
+
+**Example Workflow:**
+```bash
+# Add your hosting provider contact
+mc contacts add
+# > Name: Hetzner Support
+# > Category: services
+# > Role: Technical Support
+# > Organization: Hetzner Online
+# > Contact methods: email (support@hetzner.com), phone (+49...)
+# > Tags: hosting, critical
+
+# Quickly find during outage
+mc contacts list --category services --search "Hetzner"
+mc contacts show "Hetzner Support" --reveal
+```
+
 ### `mc export` 🆕
 Export data from MasterClaw for backup and migration (complements `mc import`)
 ```bash

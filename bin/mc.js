@@ -64,6 +64,7 @@ const { runAnalysis, displayResults } = require('../lib/analyze');
 const { pluginCmd, getInstalledPlugins, executePlugin } = require('../lib/plugin');
 const clientCmd = require('../lib/client');
 const disasterCmd = require('../lib/disaster');
+const { contactsCmd } = require('../lib/contacts');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -73,7 +74,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.34.0')  // Feature: Added disaster recovery command (mc disaster)
+  .version('0.35.0')  // Feature: Added contacts management command (mc contacts)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -146,6 +147,7 @@ program.addCommand(backupVerify);
 program.addCommand(update);
 program.addCommand(notify);
 program.addCommand(contextCmd);
+program.addCommand(contactsCmd);
 program.addCommand(events);
 program.addCommand(env.program);
 program.addCommand(envCmd);
