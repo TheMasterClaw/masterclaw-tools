@@ -310,6 +310,75 @@ mc audit-verify --rotate-key   # Rotate audit signing key (invalidates old signa
 
 All audit entries are cryptographically signed with HMAC-SHA256 to detect tampering.
 
+### `mc scan` 🔒
+Scan MasterClaw container images for security vulnerabilities before deployment.
+
+```bash
+# Scan all local MasterClaw images
+mc scan
+mc scan all
+
+# Scan a specific image
+mc scan image mc-core
+mc scan image mc-backend --details
+
+# Check scanner installation status
+mc scan status
+
+# Filter by severity
+mc scan --severity CRITICAL    # Only critical vulnerabilities
+mc scan --severity HIGH        # High and critical (default)
+mc scan --severity MEDIUM      # Medium, high, and critical
+
+# Output options
+mc scan --json                 # JSON output for CI/CD
+mc scan --details              # Show vulnerability details
+mc scan --timeout 300          # 5 minute timeout
+```
+
+**Features:**
+- **Automatic scanner detection** — Uses Trivy (preferred) or Docker Scout
+- **Severity filtering** — Focus on critical and high-severity issues
+- **JSON output** — Machine-readable output for CI/CD integration
+- **Detailed reporting** — View CVE IDs, affected packages, and fix versions
+- **Multiple image support** — Scan all MasterClaw images at once
+- **Audit logging** — Scan results logged for security compliance
+
+**Example Output:**
+```
+🔒 Security Scan Results: mc-core
+════════════════════════════════════════════════════════════
+
+📊 Vulnerability Summary:
+  CRITICAL   0
+  HIGH       2
+  MEDIUM     5
+  LOW        12
+  ─────────────────────────
+  TOTAL      19
+
+  ✅ No critical vulnerabilities found!
+
+📋 Vulnerability Details:
+
+  HIGH       CVE-2024-1234
+     Package: openssl (1.1.1k)
+     Fixed in: 1.1.1l
+     Buffer overflow vulnerability in OpenSSL
+```
+
+**CI/CD Integration:**
+```bash
+# In your CI/CD pipeline
+mc scan --severity HIGH --json || exit 1
+```
+
+**Prerequisites:**
+- Trivy (https://aquasecurity.github.io/trivy/) recommended
+- Or Docker Scout (Docker Desktop / Docker Hub)
+
+Run `mc scan status` to check scanner installation.
+
 ### Error Handling
 All security violations throw `DockerSecurityError` with:
 - Descriptive error codes for programmatic handling

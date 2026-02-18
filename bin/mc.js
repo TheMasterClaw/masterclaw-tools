@@ -76,6 +76,8 @@ const webhookCmd = require('../lib/webhook');
 const restartCmd = require('../lib/restart');
 const k8sCmd = require('../lib/k8s');
 const cacheCmd = require('../lib/cache');
+const scanCmd = require('../lib/scan');
+const { runHeal } = require('../lib/heal');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -85,7 +87,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.46.0')  // Feature: Added mc cache command for Redis cache management
+  .version('0.47.0')  // Feature: Enhanced mc heal with auto-fix capabilities
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -182,6 +184,7 @@ program.addCommand(webhookCmd);
 program.addCommand(restartCmd);
 program.addCommand(k8sCmd);
 program.addCommand(cacheCmd);
+program.addCommand(scanCmd.program);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
@@ -356,54 +359,27 @@ program
     }
   }, 'validate'));
 
-// Self-heal command
+// Self-heal command - Enhanced with auto-fix capabilities
 program
   .command('heal')
-  .description('Self-heal MasterClaw - fix common issues')
-  .action(wrapCommand(async () => {
-    console.log(chalk.blue('🩹 MasterClaw Self-Heal\n'));
-
-    const issues = [];
-    const fixes = [];
-
-    // Check Docker
-    const dockerAvailable = await docker.isDockerAvailable();
-    if (!dockerAvailable) {
-      issues.push('Docker not available');
-      fixes.push('Install Docker: https://docs.docker.com/get-docker/');
+  .description('Self-heal MasterClaw - detect and fix common issues automatically')
+  .option('-f, --fix', 'Actually fix issues (default is dry-run)', false)
+  .option('-j, --json', 'Output results as JSON')
+  .option('-c, --category <categories...>', 'Check specific categories (docker, services, system, config)')
+  .action(wrapCommand(async (options) => {
+    const result = await runHeal({
+      fix: options.fix,
+      json: options.json,
+      categories: options.category || [],
+    });
+    
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
     }
-
-    // Check services
-    const statuses = await getAllStatuses();
-    const downServices = statuses.filter(s => s.status === 'down');
-
-    if (downServices.length > 0) {
-      issues.push(`${downServices.length} service(s) down: ${downServices.map(s => s.name).join(', ')}`);
-      fixes.push('Run: mc revive');
-    }
-
-    // Check for common config issues
-    try {
-      const infraDir = await findInfraDir();
-      if (!infraDir) {
-        issues.push('Infrastructure directory not found');
-        fixes.push('Ensure you are in the masterclaw-infrastructure directory');
-      }
-    } catch (err) {
-      issues.push('Could not locate infrastructure directory');
-      fixes.push('Set --infra-dir or run from the correct directory');
-    }
-
-    if (issues.length === 0) {
-      console.log(chalk.green('✅ No issues detected - MasterClaw is healthy!'));
-    } else {
-      console.log(chalk.yellow(`⚠️  Found ${issues.length} issue(s):\n`));
-      issues.forEach((issue, i) => {
-        console.log(`  ${chalk.red(`${i + 1}.`)} ${issue}`);
-        console.log(chalk.gray(`     Fix: ${fixes[i]}`));
-      });
-      console.log('');
-      console.log(chalk.cyan('💡 Run "mc doctor" for comprehensive diagnostics'));
+    
+    // Exit with error if there are unfixable critical issues
+    const hasCritical = result.nonFixableIssues?.some(i => i.severity === 'critical');
+    if (hasCritical || (!options.fix && result.fixes?.length > 0)) {
       process.exit(ExitCode.GENERAL_ERROR);
     }
   }, 'heal'));
