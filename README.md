@@ -1109,6 +1109,59 @@ mc backup cleanup --force              # Skip confirmation
 # Export backup metadata
 mc backup export                       # Export to ./mc-backups.json
 mc backup export -o ./backups.json     # Custom output file
+
+# Cloud backup commands ☁️ (NEW!)
+mc backup cloud setup                  # Interactive setup wizard
+mc backup cloud upload                 # Upload latest backup to cloud
+mc backup cloud upload /path/to/file   # Upload specific backup
+mc backup cloud download <name>        # Download from cloud
+mc backup cloud download <name> -o ./  # Download to specific directory
+mc backup cloud list                   # List all cloud backups
+mc backup cloud sync                   # Sync all local backups to cloud
+mc backup cloud test                   # Test cloud connection
+mc backup cloud status                 # Show cloud backup status
+mc backup cloud cleanup                # Remove old cloud backups
+```
+
+**Cloud Backup Features:**
+- **Multi-provider support** — AWS S3, Google Cloud Storage, Azure Blob Storage
+- **Interactive setup** — Wizard guides you through configuration
+- **Server-side encryption** — All backups encrypted at rest (enabled by default)
+- **Automatic cleanup** — Old cloud backups removed based on retention policy
+- **Integrity verification** — Backups verified after upload
+- **Audit logging** — All operations logged for security
+
+**Cloud Backup Setup:**
+```bash
+# Run the interactive setup wizard
+mc backup cloud setup
+
+# Follow the prompts to configure:
+# 1. Select provider (AWS S3, GCS, Azure)
+# 2. Enter bucket/container name
+# 3. Enter cloud region
+# 4. Configure credentials
+# 5. Test connection
+
+# After setup, upload your first backup
+mc backup cloud upload
+```
+
+**Configuration (in `.env`):**
+```bash
+CLOUD_BACKUP_PROVIDER=s3                    # s3, gcs, or azure
+CLOUD_BACKUP_BUCKET=masterclaw-backups      # Bucket name
+CLOUD_BACKUP_PREFIX=masterclaw              # Path prefix
+CLOUD_BACKUP_REGION=us-east-1               # Cloud region
+CLOUD_BACKUP_ENCRYPTION=true                # Server-side encryption
+CLOUD_BACKUP_RETENTION_DAYS=30              # Cloud retention
+
+# Provider-specific credentials:
+AWS_ACCESS_KEY_ID=...                       # For S3
+AWS_SECRET_ACCESS_KEY=...
+GOOGLE_APPLICATION_CREDENTIALS=...          # For GCS
+AZURE_STORAGE_ACCOUNT=...                   # For Azure
+AZURE_STORAGE_KEY=...
 ```
 
 **Features:**
