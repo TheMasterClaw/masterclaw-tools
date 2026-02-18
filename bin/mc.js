@@ -20,7 +20,7 @@ const config = require('../lib/config');
 const docker = require('../lib/docker');
 const memory = require('../lib/memory');
 const task = require('../lib/task');
-const session = require('../lib/session');
+const { session } = require('../lib/session');
 const deploy = require('../lib/deploy');
 const health = require('../lib/health');
 const logs = require('../lib/logs');
@@ -67,6 +67,8 @@ const disasterCmd = require('../lib/disaster');
 const { contactsCmd } = require('../lib/contacts');
 const { runQuickstart } = require('../lib/quickstart');
 const pruneCmd = require('../lib/prune');
+const { migrateProgram } = require('../lib/migrate');
+const apiCmd = require('../lib/api');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -76,7 +78,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.37.0')  // Feature: Added Docker system prune command (mc prune)
+  .version('0.39.0')  // Feature: Added mc api command for API documentation management
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -156,6 +158,8 @@ program.addCommand(envCmd);
 program.addCommand(maintenance);
 program.addCommand(configCmd);
 program.addCommand(secretsCmd);
+program.addCommand(migrateProgram);
+program.addCommand(apiCmd);
 program.addCommand(aliasCmd);
 program.addCommand(metricsCmd);
 program.addCommand(topCmd);

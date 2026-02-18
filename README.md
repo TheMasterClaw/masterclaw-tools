@@ -1759,6 +1759,76 @@ mc restore run --dry-run       # Preview what would be restored
 - ChromaDB vector embeddings
 - Environment configuration (saved as `.env.restored` for review)
 
+### `mc migrate` 🆕
+Database migration management — run pending migrations, check status, and create new migration files.
+
+```bash
+# Run pending migrations
+mc migrate                     # Run all pending migrations
+mc migrate run                 # Same as above
+mc migrate --dry-run           # Preview migrations without applying
+mc migrate --continue-on-error # Continue even if a migration fails
+
+# Check migration status
+mc migrate status              # Show current version and pending migrations
+
+# Create new migrations
+mc migrate create "add users table"     # Create a new migration file
+```
+
+**Features:**
+- **Version tracking** — Schema versions tracked in `schema_migrations` table
+- **Dry-run mode** — Preview migrations before applying
+- **Transactional safety** — Each migration runs in a transaction
+- **Audit logging** — All migrations logged for compliance
+- **Rate limiting** — Protected against accidental repeated runs
+
+**Migration File Format:**
+Migration files are stored in `services/backend/migrations/` with the format:
+```
+001_initial_schema.sql
+002_add_sessions_table.sql
+003_add_memory_index.sql
+```
+
+**Example Migration File:**
+```sql
+-- Migration 4: Add users table
+-- Created: 2025-02-18T15:00:00Z
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_users_email ON users(email);
+```
+
+**Status Output:**
+```
+🗄️  Migration Status
+   Database: /opt/masterclaw/data/backend/mc.db
+   Migrations directory: services/backend/migrations/
+
+   Current schema version: 3
+
+   Migration Files:
+
+   001  initial schema                 ✓ Applied
+   002  add sessions table             ✓ Applied
+   003  add memory index               ✓ Applied
+   004  add users table                ○ Pending
+
+⚠️  1 migration(s) pending
+   Run: mc migrate
+```
+
+**Exit Codes:**
+- `0` — All migrations applied successfully / database up to date
+- `1` — Migration failed or database not found
+
 ### `mc secrets` 🔐
 Secure secrets management for API keys, tokens, and credentials across the MasterClaw ecosystem.
 
@@ -2028,6 +2098,65 @@ mc contacts add
 mc contacts list --category services --search "Hetzner"
 mc contacts show "Hetzner Support" --reveal
 ```
+
+### `mc api` 🆕
+API documentation management — view, export, and interact with MasterClaw Core API documentation
+
+```bash
+# Check API status and documentation URLs
+mc api status
+
+# Open API documentation in browser
+mc api docs                    # Open Swagger UI
+mc api docs --redoc           # Open ReDoc instead
+
+# Export OpenAPI specification
+mc api export                 # Export as JSON (default)
+mc api export --yaml          # Export as YAML
+mc api export -o my-api.json  # Custom output file
+
+# List available API endpoints
+mc api endpoints              # List all endpoints
+mc api endpoints --json       # Output as JSON
+mc api endpoints -t chat      # Filter by tag/category
+
+# Show API version information
+mc api version
+mc api version --json
+```
+
+**Example Output:**
+```
+🐾 MasterClaw API Status
+──────────────────────────────────────────────────
+
+API URL: http://localhost:8000
+ ● Status: Accessible
+ ● Version: 1.0.0
+
+📚 Documentation:
+   Swagger UI: http://localhost:8000/docs
+   ReDoc:      http://localhost:8000/redoc
+   OpenAPI:    http://localhost:8000/openapi.json
+
+🔌 Endpoints:
+   Health:  http://localhost:8000/health
+   Metrics: http://localhost:8000/metrics
+```
+
+**Features:**
+- **Status Check** — Verify API accessibility and get version info
+- **Documentation Access** — Open Swagger UI or ReDoc in your browser
+- **Spec Export** — Export OpenAPI spec for client generation or documentation
+- **Endpoint Discovery** — Browse all available endpoints by category
+- **JSON Output** — All commands support `--json` for scripting
+
+**Environment Variables:**
+- `CORE_URL` — API base URL (default: http://localhost:8000)
+
+**Exit Codes:**
+- `0` — API accessible, command successful
+- `1` — API unreachable or error occurred
 
 ### `mc export` 🆕
 Export data from MasterClaw for backup and migration (complements `mc import`)
