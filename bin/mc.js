@@ -51,6 +51,7 @@ const maintenance = require('../lib/maintenance');
 const configCmd = require('../lib/config-cmd');
 const { getAllCircuitStatus, resetAllCircuits, CircuitState } = require('../lib/circuit-breaker');
 const { secretsCmd } = require('../lib/secrets');
+const contextCmd = require('../lib/context');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -60,7 +61,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.22.0')  // Added audit log viewer command
+  .version('0.23.0')  // Added mc context command for rex-deus context management
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -131,6 +132,7 @@ program.addCommand(ssl);
 program.addCommand(backupVerify);
 program.addCommand(update);
 program.addCommand(notify);
+program.addCommand(contextCmd);
 program.addCommand(events);
 program.addCommand(env.program);
 program.addCommand(maintenance);
