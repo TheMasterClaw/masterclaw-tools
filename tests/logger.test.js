@@ -922,3 +922,196 @@ describe('Constants', () => {
     expect(SENSITIVE_METADATA_KEYS).toContain('token');
   });
 });
+
+// =============================================================================
+// Correlation ID Integration Tests
+// =============================================================================
+
+describe('Correlation ID Integration', () => {
+  const { 
+    runWithCorrelationId, 
+    runWithCorrelationIdAsync,
+    clearCorrelationContext 
+  } = require('../lib/correlation');
+  const { getCurrentCorrelationId: getLoggerCorrelationId } = require('../lib/logger');
+
+  beforeEach(() => {
+    clearCorrelationContext();
+    configure({ format: 'json', level: LogLevel.DEBUG });
+  });
+
+  afterEach(() => {
+    clearCorrelationContext();
+  });
+
+  test('automatically includes correlation ID in JSON log output', () => {
+    const testCorrelationId = 'mc_test_abc123';
+    
+    runWithCorrelationId(() => {
+      info('test message with correlation');
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.correlationId).toBe(testCorrelationId);
+  });
+
+  test('does not include correlationId when no correlation context exists', () => {
+    info('test message without correlation');
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.correlationId).toBeUndefined();
+  });
+
+  test('sanitizes correlation ID to prevent log injection', () => {
+    const maliciousId = 'mc_test\nabc\rdef';
+    
+    runWithCorrelationId(() => {
+      info('test message');
+    }, maliciousId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    // Correlation ID should be sanitized (newlines removed)
+    expect(parsed.correlationId).not.toContain('\n');
+    expect(parsed.correlationId).not.toContain('\r');
+  });
+
+  test('truncates correlation ID to max length', () => {
+    // Create a correlation ID longer than 64 chars
+    const longId = 'a'.repeat(100);
+    
+    runWithCorrelationId(() => {
+      info('test message');
+    }, longId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.correlationId.length).toBeLessThanOrEqual(64);
+  });
+
+  test('correlation ID is included in file output', async () => {
+    const logFile = path.join(tempDir, 'correlation-test.log');
+    const testCorrelationId = 'mc_file_test_123';
+    
+    configure({ format: 'json', file: logFile, level: LogLevel.DEBUG });
+    
+    await runWithCorrelationIdAsync(async () => {
+      info('file test message');
+    }, testCorrelationId);
+    
+    // Flush and close
+    await flush();
+    shutdown();
+    
+    // Read log file - get the last non-empty line
+    const logContent = fs.readFileSync(logFile, 'utf8');
+    const lines = logContent.trim().split('\n').filter(line => line.trim());
+    const lastLine = lines[lines.length - 1];
+    const parsed = JSON.parse(lastLine);
+    expect(parsed.correlationId).toBe(testCorrelationId);
+  });
+
+  test('correlation ID appears in verbose human output', () => {
+    configure({ format: 'human', level: LogLevel.DEBUG });
+    const testCorrelationId = 'mc_verbose_test';
+    
+    runWithCorrelationId(() => {
+      info('verbose test', {}, { verbose: true });
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    expect(output).toContain('correlation:');
+    expect(output).toContain(testCorrelationId);
+  });
+
+  test('correlation ID does not appear in non-verbose human output', () => {
+    configure({ format: 'human', level: LogLevel.DEBUG });
+    const testCorrelationId = 'mc_non_verbose';
+    
+    runWithCorrelationId(() => {
+      info('non-verbose test');
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    expect(output).not.toContain('correlation:');
+  });
+
+  test('correlation ID appears when MC_VERBOSE is set', () => {
+    process.env.MC_VERBOSE = '1';
+    configure({ format: 'human', level: LogLevel.DEBUG });
+    const testCorrelationId = 'mc_env_verbose';
+    
+    runWithCorrelationId(() => {
+      info('env verbose test');
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    expect(output).toContain('correlation:');
+    
+    delete process.env.MC_VERBOSE;
+  });
+
+  test('child logger inherits correlation ID context', () => {
+    const testCorrelationId = 'mc_child_test';
+    
+    runWithCorrelationId(() => {
+      const childLogger = child('TestContext');
+      childLogger.info('child message');
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.correlationId).toBe(testCorrelationId);
+    expect(parsed.context).toBe('TestContext');
+  });
+
+  test('getCurrentCorrelationId exported from logger returns correlation ID', () => {
+    const testCorrelationId = 'mc_export_test';
+    
+    const id = runWithCorrelationId(() => {
+      return getLoggerCorrelationId();
+    }, testCorrelationId);
+    
+    expect(id).toBe(testCorrelationId);
+  });
+
+  test('handles async correlation context correctly', async () => {
+    const testCorrelationId = 'mc_async_123';
+    
+    await runWithCorrelationIdAsync(async () => {
+      // Simulate some async work
+      await new Promise(resolve => setTimeout(resolve, 10));
+      info('async message');
+    }, testCorrelationId);
+    
+    const output = consoleLogSpy.mock.calls[0][0];
+    const parsed = JSON.parse(output);
+    expect(parsed.correlationId).toBe(testCorrelationId);
+  });
+
+  test('preserves correlation ID across nested async operations', async () => {
+    const parentId = 'mc_parent';
+    const childId = 'mc_parent_child'; // Use underscore instead of dot for valid ID
+    
+    await runWithCorrelationIdAsync(async () => {
+      info('parent start');
+      
+      await runWithCorrelationIdAsync(async () => {
+        info('child operation');
+      }, childId);
+      
+      info('parent end');
+    }, parentId);
+    
+    const startOutput = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+    const childOutput = JSON.parse(consoleLogSpy.mock.calls[1][0]);
+    const endOutput = JSON.parse(consoleLogSpy.mock.calls[2][0]);
+    
+    expect(startOutput.correlationId).toBe(parentId);
+    expect(childOutput.correlationId).toBe(childId);
+    expect(endOutput.correlationId).toBe(parentId);
+  });
+});
+
