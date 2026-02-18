@@ -25,6 +25,8 @@ const {
   checkSecrets,
   maskValue,
   REQUIRED_SECRETS,
+  SECRETS_FILE,
+  KEY_FILE,
   // Encryption functions
   deriveSystemKey,
   generateEncryptionKey,
@@ -37,24 +39,24 @@ const {
 } = require('../lib/secrets');
 
 describe('Secrets Module', () => {
-  const testSecretsFile = path.join(os.tmpdir(), `test-secrets-${Date.now()}.json`);
-  const testKeyFile = path.join(os.tmpdir(), `test-secrets-key-${Date.now()}.key`);
+  let testSecretsFile;
+  let testKeyFile;
   
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Mock CONFIG_DIR to use temp directory
-    const secretsModule = require('../lib/secrets');
-    Object.defineProperty(secretsModule, 'SECRETS_FILE', {
-      value: testSecretsFile,
-      writable: true,
-    });
-    Object.defineProperty(secretsModule, 'KEY_FILE', {
-      value: testKeyFile,
-      writable: true,
-    });
+    // Generate unique file paths for each test to prevent state leakage
+    const timestamp = Date.now();
+    const testId = Math.random().toString(36).substring(2, 11);
+    testSecretsFile = path.join(os.tmpdir(), `test-secrets-${timestamp}-${testId}.json`);
+    testKeyFile = path.join(os.tmpdir(), `test-secrets-key-${timestamp}-${testId}.key`);
     
-    // Ensure clean state
+    // Override module paths for this test
+    const secretsModule = require('../lib/secrets');
+    secretsModule.SECRETS_FILE = testSecretsFile;
+    secretsModule.KEY_FILE = testKeyFile;
+    
+    // Ensure clean state - remove any existing files
     [testSecretsFile, testKeyFile].forEach(f => {
       if (fs.existsSync(f)) {
         fs.unlinkSync(f);
@@ -66,6 +68,7 @@ describe('Secrets Module', () => {
   });
   
   afterEach(async () => {
+    // Clean up test files
     [testSecretsFile, testKeyFile].forEach(f => {
       if (fs.existsSync(f)) {
         fs.unlinkSync(f);
@@ -467,23 +470,30 @@ describe('Encryption at Rest', () => {
   });
   
   describe('Integration - Encryption with Storage', () => {
-    const testSecretsFile = path.join(os.tmpdir(), `test-secrets-enc-${Date.now()}.json`);
-    const testKeyFile = path.join(os.tmpdir(), `test-secrets-key-enc-${Date.now()}.key`);
+    let encTestSecretsFile;
+    let encTestKeyFile;
     
     beforeEach(() => {
+      // Generate unique file paths for each test
+      const timestamp = Date.now();
+      const testId = Math.random().toString(36).substring(2, 11);
+      encTestSecretsFile = path.join(os.tmpdir(), `test-secrets-enc-${timestamp}-${testId}.json`);
+      encTestKeyFile = path.join(os.tmpdir(), `test-secrets-key-enc-${timestamp}-${testId}.key`);
+      
       const secretsModule = require('../lib/secrets');
-      Object.defineProperty(secretsModule, 'SECRETS_FILE', {
-        value: testSecretsFile,
-        writable: true,
-      });
-      Object.defineProperty(secretsModule, 'KEY_FILE', {
-        value: testKeyFile,
-        writable: true,
+      secretsModule.SECRETS_FILE = encTestSecretsFile;
+      secretsModule.KEY_FILE = encTestKeyFile;
+      
+      // Ensure clean state
+      [encTestSecretsFile, encTestKeyFile].forEach(f => {
+        if (fs.existsSync(f)) {
+          fs.unlinkSync(f);
+        }
       });
     });
     
     afterEach(() => {
-      [testSecretsFile, testKeyFile].forEach(f => {
+      [encTestSecretsFile, encTestKeyFile].forEach(f => {
         if (fs.existsSync(f)) {
           fs.unlinkSync(f);
         }
@@ -493,7 +503,7 @@ describe('Encryption at Rest', () => {
     it('should store secrets in encrypted format', async () => {
       await setSecret('GATEWAY_TOKEN', 'mc_secret_token_12345678');
       
-      const content = fs.readFileSync(testSecretsFile, 'utf-8');
+      const content = fs.readFileSync(encTestSecretsFile, 'utf-8');
       const secrets = JSON.parse(content);
       
       // The stored value should be encrypted (base64 format)
