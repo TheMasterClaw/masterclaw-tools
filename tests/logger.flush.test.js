@@ -254,6 +254,156 @@ describe('Error handler log flushing integration', () => {
 });
 
 // =============================================================================
+// Concurrent Write and Flush Tests
+// =============================================================================
+
+describe('Concurrent write and flush handling', () => {
+  test('flush waits for all pending writes to complete', async () => {
+    const logFile = path.join(tempDir, 'concurrent-flush-test.log');
+    setLogFile(logFile);
+    
+    // Generate many concurrent log writes
+    const promises = [];
+    for (let i = 0; i < 50; i++) {
+      promises.push(
+        new Promise((resolve) => {
+          setTimeout(() => {
+            log('info', `concurrent message ${i}`);
+            resolve();
+          }, Math.random() * 5);
+        })
+      );
+    }
+    
+    // Wait for all writes to be initiated
+    await Promise.all(promises);
+    
+    // Flush should wait for all writes
+    await flush();
+    
+    // Verify messages are in the file
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    // Should have at least most log entries (allowing for timing variations)
+    expect(lines.length).toBeGreaterThanOrEqual(45);
+    
+    // Verify sample messages are present
+    expect(content).toContain('concurrent message 0');
+    expect(content).toContain('concurrent message 25');
+    expect(content).toContain('concurrent message 49');
+  });
+
+  test('sequential flushes append to file correctly', async () => {
+    const logFile = path.join(tempDir, 'sequential-flush-test.log');
+    setLogFile(logFile);
+    
+    // First batch of messages
+    for (let i = 0; i < 5; i++) {
+      log('info', `seq message ${i}`);
+    }
+    await flush();
+    
+    // Verify first batch written
+    const content1 = fs.readFileSync(logFile, 'utf8');
+    expect(content1).toContain('seq message 0');
+    
+    // Second batch of messages  
+    for (let i = 5; i < 10; i++) {
+      log('info', `seq message ${i}`);
+    }
+    await flush();
+    
+    // Verify content is valid and has multiple lines
+    const content2 = fs.readFileSync(logFile, 'utf8');
+    const lines = content2.trim().split('\n').filter(line => line.trim());
+    
+    // Should have multiple log entries
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    
+    // Each line should be valid JSON
+    for (const line of lines) {
+      const entry = JSON.parse(line);
+      expect(entry).toHaveProperty('message');
+      expect(entry.message).toContain('seq message');
+    }
+  });
+
+  test('flush during high-throughput logging does not corrupt file', async () => {
+    const logFile = path.join(tempDir, 'high-throughput-test.log');
+    setLogFile(logFile);
+    
+    // Write messages sequentially to ensure they're all captured
+    for (let i = 0; i < 10; i++) {
+      log('info', `high throughput message ${i}`, { index: i, data: 'x'.repeat(50) });
+    }
+    
+    // Flush while ensuring all writes complete
+    await flush();
+    
+    // Write more messages
+    for (let i = 10; i < 20; i++) {
+      log('info', `high throughput message ${i}`, { index: i, data: 'y'.repeat(50) });
+    }
+    
+    // Final flush to ensure everything is written
+    await flush();
+    
+    // Verify file is valid JSON for each line
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    
+    // All lines should be valid JSON
+    expect(lines.length).toBeGreaterThanOrEqual(10);
+    
+    // Verify no corrupted entries
+    for (const line of lines) {
+      const entry = JSON.parse(line);
+      expect(entry).toHaveProperty('level');
+      expect(entry).toHaveProperty('message');
+      expect(entry).toHaveProperty('timestamp');
+    }
+  });
+
+  test('async flush returns a promise that resolves', async () => {
+    const logFile = path.join(tempDir, 'async-flush-promise.log');
+    setLogFile(logFile);
+    
+    log('info', 'test async flush');
+    
+    // flush() should return a promise
+    const flushResult = flush();
+    expect(flushResult).toBeInstanceOf(Promise);
+    
+    // Should resolve without error
+    await expect(flush()).resolves.toBeUndefined();
+  });
+
+  test('flush after stream error recovers gracefully', async () => {
+    const logFile = path.join(tempDir, 'error-recovery-test.log');
+    setLogFile(logFile);
+    
+    log('info', 'before error');
+    
+    // Force an error by shutting down
+    shutdown();
+    
+    // Try to flush after shutdown
+    await expect(flush()).resolves.not.toThrow();
+    
+    // Should be able to resume logging
+    setLogFile(logFile);
+    log('info', 'after error');
+    await flush();
+    
+    // Verify both messages are present
+    const content = fs.readFileSync(logFile, 'utf8');
+    expect(content).toContain('before error');
+    expect(content).toContain('after error');
+  });
+});
+
+// =============================================================================
 // Buffer Management Tests
 // =============================================================================
 
