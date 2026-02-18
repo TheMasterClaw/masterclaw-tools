@@ -536,6 +536,7 @@ mc alias reset --force     # Reset to defaults
 | `quick-status` | `mc status --compact` | Quick status |
 | `full-backup` | `mc backup && mc backup-cloud` | Backup + cloud upload |
 | `health-watch` | `mc health --watch` | Watch health continuously |
+| `restart-core` | `mc restart core` | Restart AI Core service |
 
 **Examples:**
 ```bash
@@ -1362,6 +1363,38 @@ Check health of all MasterClaw services
 ```bash
 mc status
 mc status --watch  # Continuous monitoring
+```
+
+### `mc restart` 🆕
+Restart MasterClaw services with health checking
+```bash
+mc restart                      # Restart all services
+mc restart core                 # Restart specific service
+mc restart --force              # Force restart (immediate shutdown)
+mc restart --wait               # Wait for health checks (default: true)
+mc restart --timeout 120000     # Health check timeout in ms
+mc restart history              # Show restart history
+```
+
+**Features:**
+- **Graceful restart** — Stops and starts services gracefully (default)
+- **Force restart** — Kill immediately without graceful shutdown (`--force`)
+- **Health verification** — Waits for services to become healthy after restart (`--wait`)
+- **Configurable timeout** — Adjust health check timeout (`--timeout`)
+- **Per-service restart** — Restart individual services or all at once
+
+**Example Output:**
+```
+🔄 Restarting 4 service(s)...
+
+  → Restarting core... ✅ (5234ms)
+  → Restarting backend... ✅ (3121ms)
+  → Restarting gateway... ✅ (1892ms)
+  → Restarting interface... ✅ (2156ms)
+
+Results: 4 restarted, 0 failed, 12403ms
+
+✅ All services restarted successfully
 ```
 
 ### `mc deploy`

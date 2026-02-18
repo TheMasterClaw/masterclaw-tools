@@ -73,6 +73,7 @@ const sizeCmd = require('../lib/size');
 const { workflowCmd } = require('../lib/workflow');
 const dashboardCmd = require('../lib/dashboard');
 const webhookCmd = require('../lib/webhook');
+const restartCmd = require('../lib/restart');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -82,7 +83,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.43.0')  // Feature: Added mc webhook command for GitHub webhook management
+  .version('0.44.0')  // Feature: Added mc restart command for graceful service restart with health checking
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -176,6 +177,7 @@ program.addCommand(sizeCmd);
 program.addCommand(workflowCmd);
 program.addCommand(dashboardCmd);
 program.addCommand(webhookCmd);
+program.addCommand(restartCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
