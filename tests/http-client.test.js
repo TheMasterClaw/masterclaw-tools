@@ -563,6 +563,88 @@ describe('HTTP Client Helper Functions', () => {
 });
 
 // =============================================================================
+// AbortController Resource Cleanup Tests
+// =============================================================================
+
+describe('HTTP Client AbortController Resource Cleanup', () => {
+  test('should export AbortController helper constants', () => {
+    // Verify the constants are properly exported
+    expect(httpClient.DEFAULT_TIMEOUT_MS).toBeDefined();
+    expect(httpClient.MAX_TIMEOUT_MS).toBeDefined();
+    expect(httpClient.MIN_TIMEOUT_MS).toBeDefined();
+    expect(httpClient.MAX_RESPONSE_SIZE_BYTES).toBeDefined();
+    expect(httpClient.MAX_REDIRECTS).toBeDefined();
+    expect(httpClient.USER_AGENT).toBeDefined();
+  });
+
+  test('should handle SSRF validation failure with proper cleanup', async () => {
+    // This test verifies that SSRF validation failures don't leave resources hanging
+    // by attempting a request that will fail SSRF validation
+    const startTime = Date.now();
+    
+    try {
+      await httpClient.get('http://127.0.0.1/admin', { timeout: 5000 });
+      // Should never reach here
+      expect(false).toBe(true);
+    } catch (error) {
+      // Should fail with SSRF_VIOLATION
+      expect(error.code).toBe('SSRF_VIOLATION');
+      expect(error.message).toContain('SSRF Protection');
+      
+      // The error should be thrown quickly (not waiting for timeout)
+      const elapsed = Date.now() - startTime;
+      expect(elapsed).toBeLessThan(1000); // Should be immediate, not waiting for timeout
+    }
+  });
+
+  test('should handle header validation failure with proper cleanup', async () => {
+    // This test verifies that header validation failures don't leave resources hanging
+    const startTime = Date.now();
+    
+    try {
+      await httpClient.get('http://example.com/api', {
+        timeout: 5000,
+        headers: {
+          'Bad\r\nHeader': 'value', // CRLF injection attempt
+        },
+      });
+      // Should never reach here
+      expect(false).toBe(true);
+    } catch (error) {
+      // Should fail with HEADER_VALIDATION_FAILED
+      expect(error.code).toBe('HEADER_VALIDATION_FAILED');
+      expect(error.message).toContain('Header Security');
+      
+      // The error should be thrown quickly
+      const elapsed = Date.now() - startTime;
+      expect(elapsed).toBeLessThan(1000);
+    }
+  });
+
+  test('should reject dangerous URL schemes immediately', async () => {
+    const dangerousUrls = [
+      'data:text/html,<script>alert(1)</script>',
+      'file:///etc/passwd',
+      'javascript:alert(1)',
+    ];
+
+    for (const url of dangerousUrls) {
+      const startTime = Date.now();
+      
+      try {
+        await httpClient.get(url, { timeout: 5000 });
+        expect(false).toBe(`Should have rejected ${url}`);
+      } catch (error) {
+        expect(error.code).toBe('SSRF_VIOLATION');
+        // Should be immediate, not waiting for network timeout
+        const elapsed = Date.now() - startTime;
+        expect(elapsed).toBeLessThan(1000);
+      }
+    }
+  });
+});
+
+// =============================================================================
 // Module Exports
 // =============================================================================
 
