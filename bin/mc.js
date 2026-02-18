@@ -2,7 +2,7 @@
 /**
  * MasterClaw CLI - mc
  * Enhanced with memory, task, and advanced commands
- * 
+ *
  * Features:
  * - Comprehensive error handling with user-friendly messages
  * - Security audit logging integration
@@ -79,31 +79,31 @@ program
   .option('-w, --watch', 'watch mode - continuous monitoring')
   .action(wrapCommand(async (options) => {
     console.log(chalk.blue('🐾 MasterClaw Status\n'));
-    
+
     const statuses = await getAllStatuses();
-    
+
     let healthyCount = 0;
     let downCount = 0;
-    
+
     statuses.forEach(s => {
-      const icon = s.status === 'healthy' ? chalk.green('✅') : 
-                   s.status === 'unhealthy' ? chalk.yellow('⚠️') : chalk.red('❌');
-      const statusColor = s.status === 'healthy' ? chalk.green : 
-                          s.status === 'unhealthy' ? chalk.yellow : chalk.red;
-      
+      const icon = s.status === 'healthy' ? chalk.green('✅') :
+        s.status === 'unhealthy' ? chalk.yellow('⚠️') : chalk.red('❌');
+      const statusColor = s.status === 'healthy' ? chalk.green :
+        s.status === 'unhealthy' ? chalk.yellow : chalk.red;
+
       console.log(`  ${icon} ${chalk.bold(s.name)}: ${statusColor(s.status)}`);
-      
+
       if (s.responseTime) {
         console.log(chalk.gray(`     Response: ${s.responseTime}`));
       }
       if (s.error) {
         console.log(chalk.gray(`     Error: ${s.error}`));
       }
-      
+
       if (s.status === 'healthy') healthyCount++;
       else downCount++;
     });
-    
+
     console.log('');
     if (downCount === 0) {
       console.log(chalk.green(`✅ All ${healthyCount} services are healthy`));
@@ -163,11 +163,11 @@ program
       iterations: parseInt(options.iterations, 10),
       apiUrl: options.apiUrl,
     });
-    
+
     if (!results) {
       process.exit(ExitCode.SERVICE_UNAVAILABLE);
     }
-    
+
     if (!results.success) {
       process.exit(ExitCode.GENERAL_ERROR);
     }
@@ -210,21 +210,21 @@ program
   .action(wrapCommand(async (options) => {
     if (options.quick) {
       const result = await runQuickSmokeTest({ apiUrl: options.apiUrl });
-      
+
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
       }
-      
+
       if (!result.success) {
         process.exit(ExitCode.SERVICE_UNAVAILABLE);
       }
     } else {
       const result = await runSmokeTests({ apiUrl: options.apiUrl });
-      
+
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
       }
-      
+
       if (!result.success) {
         process.exit(result.critical ? ExitCode.SERVICE_UNAVAILABLE : ExitCode.GENERAL_ERROR);
       }
@@ -259,7 +259,7 @@ program
       fix: options.fix,
       json: options.json,
     });
-    
+
     // Exit with error if critical or high issues found
     if (!report.summary.healthy) {
       process.exit(ExitCode.VALIDATION_FAILED);
@@ -283,17 +283,17 @@ program
       console.log(getRemediationSteps());
       return;
     }
-    
+
     const infraDir = await findInfraDir() || process.cwd();
-    
+
     const results = await validate({
       infraDir,
       dev: options.dev,
       skipPorts: options.skipPorts,
     });
-    
+
     printResults(results, { quiet: options.quiet });
-    
+
     // Exit with error code if validation failed
     if (!results.passed) {
       process.exit(ExitCode.VALIDATION_FAILED);
@@ -306,26 +306,26 @@ program
   .description('Self-heal MasterClaw - fix common issues')
   .action(wrapCommand(async () => {
     console.log(chalk.blue('🩹 MasterClaw Self-Heal\n'));
-    
+
     const issues = [];
     const fixes = [];
-    
+
     // Check Docker
     const dockerAvailable = await docker.isDockerAvailable();
     if (!dockerAvailable) {
       issues.push('Docker not available');
       fixes.push('Install Docker: https://docs.docker.com/get-docker/');
     }
-    
+
     // Check services
     const statuses = await getAllStatuses();
     const downServices = statuses.filter(s => s.status === 'down');
-    
+
     if (downServices.length > 0) {
       issues.push(`${downServices.length} service(s) down: ${downServices.map(s => s.name).join(', ')}`);
       fixes.push('Run: mc revive');
     }
-    
+
     // Check for common config issues
     try {
       const infraDir = await findInfraDir();
@@ -337,7 +337,7 @@ program
       issues.push('Could not locate infrastructure directory');
       fixes.push('Set --infra-dir or run from the correct directory');
     }
-    
+
     if (issues.length === 0) {
       console.log(chalk.green('✅ No issues detected - MasterClaw is healthy!'));
     } else {
@@ -358,16 +358,16 @@ program
   .description('Run comprehensive diagnostics')
   .action(wrapCommand(async () => {
     console.log(chalk.blue('🔬 MasterClaw Doctor\n'));
-    
+
     const checks = [
       { name: 'Docker', check: docker.isDockerAvailable },
       { name: 'Docker Compose', check: docker.isComposeAvailable },
       { name: 'Services', check: getAllStatuses },
     ];
-    
+
     let passedChecks = 0;
     let failedChecks = 0;
-    
+
     for (const { name, check } of checks) {
       process.stdout.write(`Checking ${name}... `);
       try {
@@ -402,10 +402,10 @@ program
       }
       failedChecks++;
     }
-    
+
     console.log('');
     console.log(chalk.cyan(`Results: ${chalk.green(`${passedChecks} passed`)}, ${chalk.red(`${failedChecks} failed`)}`));
-    
+
     if (failedChecks > 0) {
       console.log(chalk.gray('\nRun with --verbose for more details'));
       process.exit(ExitCode.GENERAL_ERROR);
@@ -421,26 +421,26 @@ program
   .option('-d, --deps <deps...>', 'Check specific dependencies (docker, compose, infra-dir, config)')
   .option('-q, --quiet', 'Minimal output, exit code only')
   .action(wrapCommand(async (commandName, options) => {
-    const { 
-      validateCommandDeps, 
-      validateCustomDeps, 
-      validateDocker, 
-      validateDockerCompose, 
+    const {
+      validateCommandDeps,
+      validateCustomDeps,
+      validateDocker,
+      validateDockerCompose,
       validateInfraDir,
       validateDiskSpace,
       validateMemory,
-      DependencyType 
+      DependencyType
     } = depsValidator;
-    
+
     // Determine what to check
     let results;
-    
+
     if (options.all || (!commandName && !options.deps)) {
       // Check all common dependencies
       if (!options.quiet) {
         console.log(chalk.blue('🔍 Checking MasterClaw Dependencies\n'));
       }
-      
+
       results = await validateCustomDeps([
         DependencyType.DOCKER,
         DependencyType.DOCKER_COMPOSE,
@@ -461,60 +461,60 @@ program
         'disk': DependencyType.DISK_SPACE,
         'memory': DependencyType.MEMORY,
       };
-      
+
       const depsToCheck = options.deps.map(d => depMap[d]).filter(Boolean);
-      
+
       if (!options.quiet) {
         console.log(chalk.blue(`🔍 Checking dependencies: ${options.deps.join(', ')}\n`));
       }
-      
+
       results = await validateCustomDeps(depsToCheck);
     } else if (commandName) {
       // Check dependencies for a specific command
       if (!options.quiet) {
         console.log(chalk.blue(`🔍 Checking dependencies for '${commandName}'\n`));
       }
-      
+
       results = await validateCommandDeps(commandName);
     }
-    
+
     // Display results
     if (!options.quiet) {
       let passed = 0;
       let failed = 0;
-      
+
       for (const result of results.results) {
-        const icon = result.satisfied 
-          ? chalk.green('✅') 
-          : result.severity === 'critical' 
-            ? chalk.red('❌') 
+        const icon = result.satisfied
+          ? chalk.green('✅')
+          : result.severity === 'critical'
+            ? chalk.red('❌')
             : chalk.yellow('⚠️');
-        
+
         console.log(`${icon} ${result.message}`);
-        
+
         if (!result.satisfied && result.remediation) {
           for (const step of result.remediation.slice(0, 3)) {
             console.log(chalk.gray(`   → ${step}`));
           }
         }
-        
+
         if (result.satisfied) {
           passed++;
         } else {
           failed++;
         }
       }
-      
+
       console.log('');
       console.log(chalk.cyan(`Results: ${chalk.green(`${passed} passed`)}, ${failed > 0 ? chalk.red(`${failed} failed`) : chalk.green(`${failed} failed`)}`));
-      
+
       if (results.canProceed) {
         console.log(chalk.green('\n✅ All critical dependencies satisfied - ready to proceed!'));
       } else {
         console.log(chalk.red('\n❌ Critical dependencies missing - cannot proceed'));
       }
     }
-    
+
     // Exit with appropriate code
     if (!results.canProceed) {
       process.exit(ExitCode.VALIDATION_FAILED);
@@ -533,25 +533,25 @@ program
   .action(wrapCommand(async (message, options) => {
     // Security: Validate and sanitize input
     const { validateChatInput, sanitizeChatInput } = require('../lib/chat-security');
-    
+
     // Validate input before processing
     const validation = validateChatInput(message);
     if (!validation.valid) {
       console.log(chalk.yellow(`⚠️  ${validation.error}`));
       process.exit(ExitCode.INVALID_ARGUMENTS);
     }
-    
+
     // Sanitize input to prevent injection
     const sanitizedMessage = sanitizeChatInput(message);
-    
+
     // Rate limiting for chat command (10 per minute)
     await rateLimiter.enforceRateLimit('chat', { command: 'chat', messageLength: sanitizedMessage.length });
-    
+
     console.log(chalk.blue('🐾 Sending message...\n'));
-    
+
     const coreUrl = await config.get('core.url') || 'http://localhost:8000';
     const axios = require('axios');
-    
+
     try {
       const response = await axios.post(`${coreUrl}/v1/chat`, {
         message: sanitizedMessage,
@@ -561,12 +561,12 @@ program
         maxContentLength: 100 * 1024, // 100KB max response
         maxBodyLength: 50 * 1024, // 50KB max request body
       });
-      
+
       // Validate response structure
       if (!response.data || typeof response.data.response !== 'string') {
         throw new Error('Invalid response from MasterClaw API');
       }
-      
+
       console.log(chalk.cyan('MasterClaw:'));
       console.log(response.data.response);
     } catch (err) {
@@ -600,14 +600,14 @@ program
   .action(wrapCommand(async (options) => {
     const ora = require('ora');
     const spinner = ora('Exporting data...').start();
-    
+
     try {
       await fs.ensureDir(options.output);
-      
+
       // Export config
       const cfg = await config.list();
       await fs.writeJson(path.join(options.output, 'config.json'), cfg, { spaces: 2 });
-      
+
       spinner.succeed(`Data exported to ${options.output}`);
       console.log(chalk.gray(`   Config: ${path.join(options.output, 'config.json')}`));
     } catch (err) {
@@ -629,12 +629,12 @@ program
     await rateLimiter.enforceRateLimit('config-audit', { command: 'config-audit' });
 
     console.log(chalk.blue('🔒 MasterClaw Config Security Audit\n'));
-    
+
     const audit = await config.securityAudit();
-    
+
     console.log(`Timestamp: ${audit.timestamp}`);
     console.log(`Status: ${audit.secure ? chalk.green('✅ Secure') : chalk.red('❌ Issues Found')}\n`);
-    
+
     if (audit.issues.length > 0) {
       console.log(chalk.yellow('Issues:'));
       audit.issues.forEach((issue, i) => {
@@ -642,7 +642,7 @@ program
       });
       console.log('');
     }
-    
+
     if (audit.recommendations.length > 0) {
       console.log(chalk.cyan('Recommendations:'));
       audit.recommendations.forEach((rec, i) => {
@@ -650,11 +650,11 @@ program
       });
       console.log('');
     }
-    
+
     if (audit.checks.hasSensitiveData) {
       console.log(chalk.gray('ℹ️  Config contains sensitive data (tokens/keys)'));
     }
-    
+
     if (audit.secure) {
       console.log(chalk.green('✅ Configuration is secure'));
     } else {
@@ -671,9 +671,9 @@ program
     await rateLimiter.enforceRateLimit('config-fix', { command: 'config-fix' });
 
     console.log(chalk.blue('🔧 Fixing Config Permissions\n'));
-    
+
     const result = await config.fixPermissions();
-    
+
     if (result.success) {
       console.log(chalk.green('✅ Permissions fixed:'));
       result.results.forEach(r => {
@@ -699,7 +699,7 @@ program
       console.log(chalk.blue('🔑 Rotating Audit Signing Key\n'));
       console.log(chalk.yellow('⚠️  Warning: This will invalidate all existing audit signatures'));
       console.log(chalk.gray('   New entries will be signed with the new key.\n'));
-      
+
       const result = await rotateSigningKey();
       if (result) {
         console.log(chalk.green('✅ Audit signing key rotated successfully'));
@@ -711,32 +711,32 @@ program
     }
 
     console.log(chalk.blue('🔒 Verifying Audit Log Integrity\n'));
-    
+
     const hours = parseInt(options.hours, 10) || 168;
-    const result = await verifyAuditIntegrity({ 
+    const result = await verifyAuditIntegrity({
       verbose: options.verbose,
       hours,
     });
-    
+
     console.log(chalk.cyan('Results:'));
     console.log(`  Files checked: ${result.filesChecked.length}`);
     console.log(`  Total entries: ${result.totalEntries}`);
     console.log(`  Valid signatures: ${chalk.green(result.validSignatures)}`);
-    
+
     if (result.unsignedEntries > 0) {
       console.log(`  Unsigned entries: ${chalk.yellow(result.unsignedEntries)}`);
     }
-    
+
     if (result.invalidSignatures > 0) {
-      console.log(`  ${chalk.red('⚠️  INVALID signatures: ' + result.invalidSignatures)}`);
+      console.log(`  ${chalk.red(`⚠️  INVALID signatures: ${  result.invalidSignatures}`)}`);
     }
-    
+
     console.log('');
-    
+
     if (result.invalidSignatures > 0) {
       console.log(chalk.red('❌ Audit log integrity check FAILED'));
       console.log(chalk.yellow('⚠️  Some entries may have been tampered with!'));
-      
+
       if (options.verbose) {
         console.log(chalk.gray('\nDetails:'));
         result.errors.forEach(err => {
@@ -745,7 +745,7 @@ program
       } else {
         console.log(chalk.gray('\nRun with --verbose for details'));
       }
-      
+
       process.exit(ExitCode.SECURITY_VIOLATION);
     } else if (result.valid) {
       console.log(chalk.green('✅ Audit log integrity verified'));
@@ -984,7 +984,7 @@ program
         if (status[cmd]) {
           const s = status[cmd];
           const usageColor = s.remaining === 0 ? chalk.red :
-                            s.remaining < s.limit * 0.2 ? chalk.yellow : chalk.green;
+            s.remaining < s.limit * 0.2 ? chalk.yellow : chalk.green;
           console.log(`  ${chalk.bold(cmd.padEnd(15))} ${usageColor(`${s.used}/${s.limit}`)} ${chalk.gray(`(resets at ${new Date(s.resetTime).toLocaleTimeString()})`)}`);
         }
       }
@@ -1019,7 +1019,7 @@ program
         console.log(chalk.green('✅ All circuits reset'));
         return;
       }
-      
+
       const circuitName = `service-${options.reset}`;
       const { getCircuit } = require('../lib/circuit-breaker');
       const circuit = getCircuit(circuitName);
@@ -1034,7 +1034,7 @@ program
 
     // Default: show status
     const statuses = getAllCircuitStatus();
-    
+
     if (options.json) {
       console.log(JSON.stringify(statuses, null, 2));
       return;
@@ -1050,14 +1050,14 @@ program
     // Service name mapping
     const serviceNames = {
       'service-core': 'AI Core',
-      'service-backend': 'Backend API', 
+      'service-backend': 'Backend API',
       'service-interface': 'Interface',
       'service-gateway': 'Gateway',
     };
 
     for (const status of statuses) {
       const displayName = serviceNames[status.name] || status.name;
-      
+
       // State icon
       let stateIcon, stateColor;
       switch (status.state) {
@@ -1098,7 +1098,7 @@ program
       console.log(`   State: ${stateColor(status.state)} ${healthIcon}`);
       console.log(`   Calls: ${status.stats.totalCalls} total (${status.stats.totalSuccesses} success, ${status.stats.totalFailures} failed)`);
       console.log(`   Error Rate: ${status.stats.errorRate}`);
-      
+
       if (status.stats.failuresInWindow > 0) {
         console.log(chalk.yellow(`   Recent Failures: ${status.stats.failuresInWindow} in last ${status.config.monitorWindowMs / 1000}s`));
       }
@@ -1128,7 +1128,7 @@ program
     // Quick status mode
     if (options.status) {
       const status = await securityMonitor.getQuickSecurityStatus();
-      
+
       if (options.json) {
         console.log(JSON.stringify(status, null, 2));
       } else {
@@ -1137,7 +1137,7 @@ program
         console.log(chalk.gray(`   Last hour: ${status.lastHour.totalEvents} events, ${status.lastHour.securityViolations} violations`));
         console.log(chalk.gray(`   Config secure: ${status.configSecure ? 'Yes' : 'No'}`));
       }
-      
+
       if (status.status !== 'ok') {
         process.exit(ExitCode.SECURITY_VIOLATION);
       }
@@ -1146,7 +1146,7 @@ program
 
     // Full scan mode (default)
     const hours = parseInt(options.hours, 10) || 24;
-    
+
     if (!options.json) {
       console.log(chalk.blue('🔒 MasterClaw Security Scan'));
       console.log(chalk.gray(`   Analyzing last ${hours} hours...\n`));
@@ -1154,9 +1154,9 @@ program
 
     const ora = require('ora');
     const spinner = ora('Scanning for security threats...').start();
-    
+
     const result = await securityMonitor.runSecurityScan({ hours });
-    
+
     spinner.stop();
 
     if (options.json) {
@@ -1171,7 +1171,7 @@ program
       // Threat summary
       const { summary } = result;
       const totalThreats = summary.critical + summary.high + summary.medium + summary.low;
-      
+
       if (totalThreats === 0) {
         console.log(chalk.green('✅ No threats detected'));
       } else {
@@ -1195,8 +1195,8 @@ program
         console.log(chalk.cyan('\nDetailed Threat Information:'));
         result.threats.slice(0, 5).forEach((threat, i) => {
           const levelColor = threat.level === 'critical' ? chalk.red :
-                            threat.level === 'high' ? chalk.red :
-                            threat.level === 'medium' ? chalk.yellow : chalk.gray;
+            threat.level === 'high' ? chalk.red :
+              threat.level === 'medium' ? chalk.yellow : chalk.gray;
           console.log(`\n  ${i + 1}. ${levelColor(threat.type.toUpperCase())} (${levelColor(threat.level)})`);
           console.log(`     Source: ${threat.source}`);
           console.log(`     Time: ${threat.timestamp}`);
@@ -1301,7 +1301,7 @@ program
         if (result.stderr) {
           console.error(chalk.yellow(result.stderr));
         }
-        
+
         if (result.exitCode === 0) {
           console.log(chalk.gray(`\n✅ Completed in ${result.duration}ms`));
         } else {
@@ -1330,9 +1330,9 @@ program
   .option('-a, --all', 'Show all containers including stopped', false)
   .action(wrapCommand(async (options) => {
     console.log(chalk.blue('🐾 MasterClaw Containers\n'));
-    
+
     const containers = await getRunningContainers();
-    
+
     if (containers.length === 0) {
       console.log(chalk.yellow('No MasterClaw containers are running'));
       console.log(chalk.gray('   Run "mc revive" to start services'));
@@ -1344,7 +1344,7 @@ program
       console.log(`  ${chalk.green('●')} ${chalk.bold(c.name)}`);
       console.log(chalk.gray(`     Status: ${c.uptime}`));
     }
-    
+
     console.log('');
     console.log(chalk.gray(`Use 'mc exec <container> <command>' to run commands`));
     console.log(chalk.gray(`Use 'mc exec <container> sh --shell' for interactive shell`));
