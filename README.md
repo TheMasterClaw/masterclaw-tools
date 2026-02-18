@@ -2129,6 +2129,72 @@ Once synced, the AI can reference this context in conversations:
 - MasterClaw Core must be running with memory support
 - API connection to Core (configured via `mc config`)
 
+### Context API Commands 🆕
+Query rex-deus context directly from MasterClaw Core API. These commands provide remote access to context data without requiring local file access.
+
+```bash
+# Query projects via API
+mc context api-projects                    # List all projects
+mc context api-projects --json             # Output as JSON
+mc context api-projects --status active    # Filter by status
+mc context api-projects --priority high    # Filter by priority
+
+# Query goals via API
+mc context api-goals                       # List all goals
+mc context api-goals --status active       # Filter by active goals
+mc context api-goals --priority critical   # Filter by priority
+
+# Query people via API (NEW)
+mc context api-people                      # List all people
+mc context api-people --role developer     # Filter by role
+mc context api-people --relationship friend # Filter by relationship type
+
+# Query knowledge via API (NEW)
+mc context api-knowledge                   # List all knowledge entries
+mc context api-knowledge --category tech   # Filter by category
+mc context api-knowledge --confidence high # Filter by confidence level
+
+# Query preferences via API (NEW)
+mc context api-preferences                 # List all preferences
+mc context api-preferences --category Communication  # Filter by category
+mc context api-preferences --priority required       # Filter by priority
+
+# Search across all context via API
+mc context api-search "tech stack"         # Search all context files
+mc context api-search "React" --json       # JSON output for scripting
+
+# Get context summary via API
+mc context api-summary                     # Overview of all context
+mc context api-summary --json              # Machine-readable summary
+```
+
+**When to Use API vs File Commands:**
+| Use Case | File Commands | API Commands |
+|----------|--------------|--------------|
+| Local development | ✅ `mc context show` | ✅ `mc context api-*` |
+| Remote server access | ❌ Not available | ✅ `mc context api-*` |
+| Scripting/automation | ❌ File parsing | ✅ `mc context api-* --json` |
+| CI/CD pipelines | ❌ Requires files | ✅ `mc context api-summary` |
+| Filtered results | ❌ Manual grep | ✅ Built-in filters |
+
+**API Command Features:**
+- **JSON Output** — All commands support `--json` for programmatic access
+- **Filtering** — Query parameters for status, priority, category, etc.
+- **No File Access Required** — Works from any machine with API access
+- **Live Data** — Always returns current context from Core
+
+**Example Workflow:**
+```bash
+# Check active projects on remote server
+ssh production "mc context api-projects --status active --json" | jq '.projects[].name'
+
+# Find people with specific role in CI pipeline
+mc context api-people --role developer --json | jq '.people[] | select(.tags[] | contains("backend"))'
+
+# Get tech stack preferences for project setup
+mc context api-preferences --category Technical --json
+```
+
 ### `mc contacts` 🆕
 Manage personal and professional contacts in rex-deus. Store contact information securely with structured data, search capabilities, and notification integration.
 
