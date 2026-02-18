@@ -18,6 +18,8 @@ npx .
 
 ## Security 🔒
 
+> 📖 **Comprehensive security documentation**: See [SECURITY.md](./SECURITY.md) for detailed security features, threat model, vulnerability reporting, and best practices.
+
 MasterClaw Tools implements comprehensive security hardening:
 
 ### Distributed Tracing & Correlation IDs 🔗
