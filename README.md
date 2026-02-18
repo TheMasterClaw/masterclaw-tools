@@ -897,10 +897,84 @@ mc logs query --labels         # List available Loki labels
 
 **Note:** `mc logs query` requires the monitoring stack (Loki) to be running. Start it with `make monitor`.
 
-### `mc backup`
-Trigger manual backup
+### `mc backup` 🆕
+Comprehensive backup management — create, list, analyze, and clean up backups
+
 ```bash
-mc backup
+# Create backups
+mc backup                              # Create a new backup
+mc backup --retention-days 14          # Override retention period
+mc backup --quiet                      # Minimal output
+
+# List and view backups
+mc backup list                         # List all backups (last 10)
+mc backup list --limit 20              # Show last 20 backups
+mc backup list --json                  # Output as JSON
+
+# Backup statistics and trends
+mc backup stats                        # Show backup statistics
+mc backup stats --json                 # Output as JSON
+
+# Clean up old backups
+mc backup cleanup                      # Remove backups past retention
+mc backup cleanup --dry-run            # Preview what would be deleted
+mc backup cleanup --force              # Skip confirmation
+
+# Export backup metadata
+mc backup export                       # Export to ./mc-backups.json
+mc backup export -o ./backups.json     # Custom output file
+```
+
+**Features:**
+- **Create on demand** — Trigger backups manually from CLI
+- **List with details** — Size, age, and creation date for each backup
+- **Statistics** — Total count, size trends, backup frequency analysis
+- **Smart cleanup** — Remove old backups with dry-run preview
+- **Export metadata** — JSON export for external tracking
+
+**Statistics include:**
+- Total backup count and cumulative size
+- Average backup size
+- Backup frequency (average days between backups)
+- Size growth trend (comparing recent vs older backups)
+- Retention policy status
+
+**Example Output:**
+```
+🐾 MasterClaw Backups
+
+● masterclaw_backup_20250218_001500.tar.gz
+   Size: 450MB  |  Created: 2/18/2026, 12:15:00 AM  |  2 hours ago
+○ masterclaw_backup_20250217_120000.tar.gz
+   Size: 448MB  |  Created: 2/17/2026, 12:00:00 PM  |  14 hours ago
+○ masterclaw_backup_20250216_030000.tar.gz
+   Size: 445MB  |  Created: 2/16/2026, 3:00:00 AM  |  2 days ago
+
+Total: 3 backups
+Run 'mc restore' to restore from a backup
+```
+
+**Statistics Example:**
+```
+🐾 Backup Statistics
+
+Overview:
+  Total backups: 12
+  Total size: 5.2 GB
+  Average size: 450MB
+
+Timeline:
+  Oldest backup: 2/6/2026
+  Newest backup: 2/18/2026
+  Backup frequency: ~1.0 days
+
+Trends:
+  Size trend: 📈 +2.3%
+
+Retention:
+  Policy: 7 days
+  Backups past retention: 5
+  Run 'mc backup cleanup' to remove old backups
 ```
 
 ### `mc backup-verify`
@@ -1395,6 +1469,7 @@ The CLI uses these modules:
 - `lib/deploy.js` - Deployment management
 - `lib/logs.js` - Log viewing, management, export, and Loki integration
 - `lib/restore.js` - Disaster recovery and backup restoration
+- `lib/backup.js` - **NEW: Comprehensive backup management (create, list, stats, cleanup)**
 - `lib/import.js` - Import data from export files (complements restore)
 - `lib/cleanup.js` - Session and memory cleanup management
 - `lib/validate.js` - Pre-flight environment validation
