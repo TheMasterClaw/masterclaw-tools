@@ -9,13 +9,9 @@
  * - Redirection handling
  */
 
-// Import the SSRF validation from validate module
+const httpClient = require('../lib/http-client');
 const { validateDomainSSRFProtection } = require('../lib/validate');
-
-// Import security utilities
 const { isValidIpAddress, isValidHostname } = require('../lib/security');
-
-// Import services configuration
 const { SERVICES } = require('../lib/services');
 
 // =============================================================================
@@ -115,6 +111,191 @@ describe('SSRF Protection', () => {
     const longDomain = 'a'.repeat(250) + '.com';
     const longResult = validateDomainSSRFProtection(longDomain);
     expect(longResult.warnings.length > 0 || longResult.valid).toBe(true);
+  });
+});
+
+// =============================================================================
+// HTTP Client URL Validation Tests
+// =============================================================================
+
+describe('HTTP Client URL Validation', () => {
+  test('should block dangerous URL schemes', () => {
+    const dangerousUrls = [
+      { url: 'data:text/html,<script>alert(1)</script>', reason: 'data:' },
+      { url: 'file:///etc/passwd', reason: 'file:' },
+      { url: 'javascript:alert(1)', reason: 'javascript:' },
+      { url: 'JavaScript:alert(1)', reason: 'javascript:' },
+    ];
+
+    for (const { url, reason } of dangerousUrls) {
+      const result = httpClient.validateUrlSSRF(url);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('not allowed');
+    }
+  });
+
+  test('should block private IP URLs by default', () => {
+    const privateUrls = [
+      'http://127.0.0.1/',
+      'http://10.0.0.1/',
+      'http://192.168.1.1/',
+      'https://localhost/',
+    ];
+
+    for (const url of privateUrls) {
+      const result = httpClient.validateUrlSSRF(url);
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/private|SSRF/i);
+    }
+  });
+
+  test('should allow private IPs when explicitly enabled', () => {
+    const privateUrls = [
+      'http://127.0.0.1/health',
+      'http://localhost/api',
+    ];
+
+    for (const url of privateUrls) {
+      const result = httpClient.validateUrlSSRF(url, { allowPrivateIPs: true });
+      expect(result.valid).toBe(true);
+    }
+  });
+
+  test('should allow valid public URLs', () => {
+    const validUrls = [
+      'https://api.openai.com/v1/chat',
+      'https://api.anthropic.com/v1/messages',
+      'https://example.com/api/health',
+    ];
+
+    for (const url of validUrls) {
+      const result = httpClient.validateUrlSSRF(url);
+      expect(result.valid).toBe(true);
+    }
+  });
+
+  test('should extract hostname correctly', () => {
+    const testCases = [
+      { url: 'https://example.com/path', expected: 'example.com' },
+      { url: 'http://localhost:3000', expected: 'localhost' },
+      { url: 'https://api.example.com:8443/v1', expected: 'api.example.com' },
+    ];
+
+    for (const { url, expected } of testCases) {
+      const hostname = httpClient.extractHostname(url);
+      expect(hostname).toBe(expected);
+    }
+
+    expect(httpClient.extractHostname('invalid')).toBeNull();
+    expect(httpClient.extractHostname('')).toBeNull();
+  });
+});
+
+// =============================================================================
+// HTTP Client Header Security Tests
+// =============================================================================
+
+describe('HTTP Client Header Security', () => {
+  test('should sanitize valid headers', () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer token123',
+      'X-Custom-Header': 'value',
+    };
+
+    const result = httpClient.validateAndSanitizeHeaders(headers);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized).toEqual(headers);
+  });
+
+  test('should reject headers with injection attempts', () => {
+    const maliciousHeaders = [
+      { 'X-Custom': 'value\r\nInjected: evil' },
+      { 'X-Custom': 'value\nInjected: evil' },
+      { 'X-Custom': 'value\rInjected: evil' },
+    ];
+
+    for (const headers of maliciousHeaders) {
+      const result = httpClient.validateAndSanitizeHeaders(headers);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('injection');
+    }
+  });
+
+  test('should reject invalid header names', () => {
+    const invalidHeaders = [
+      { 'Invalid Name': 'value' }, // Space in name
+      { 'Invalid@Name': 'value' }, // Special char in name
+      { '': 'value' }, // Empty name
+    ];
+
+    for (const headers of invalidHeaders) {
+      const result = httpClient.validateAndSanitizeHeaders(headers);
+      expect(result.valid).toBe(false);
+    }
+  });
+
+  test('should handle null/undefined headers', () => {
+    expect(httpClient.validateAndSanitizeHeaders(null).valid).toBe(true);
+    expect(httpClient.validateAndSanitizeHeaders(undefined).valid).toBe(true);
+    expect(httpClient.validateAndSanitizeHeaders({}).valid).toBe(true);
+  });
+
+  test('should sanitize header values', () => {
+    const headers = {
+      'X-Long': 'a'.repeat(10000),
+    };
+
+    const result = httpClient.validateAndSanitizeHeaders(headers);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized['X-Long'].length).toBeLessThan(10000);
+  });
+});
+
+// =============================================================================
+// HTTP Client Response Size Validation Tests
+// =============================================================================
+
+describe('HTTP Client Response Size Validation', () => {
+  test('should validate response with content-length header', () => {
+    const smallResponse = {
+      headers: { 'content-length': '1024' },
+      data: 'small',
+    };
+
+    expect(httpClient.validateResponseSize(smallResponse)).toBe(true);
+
+    const largeResponse = {
+      headers: { 'content-length': String(20 * 1024 * 1024) }, // 20MB
+      data: 'large',
+    };
+
+    expect(httpClient.validateResponseSize(largeResponse)).toBe(false);
+  });
+
+  test('should validate response by data size', () => {
+    const validResponse = {
+      headers: {},
+      data: 'small data',
+    };
+
+    expect(httpClient.validateResponseSize(validResponse)).toBe(true);
+
+    const oversizedResponse = {
+      headers: {},
+      data: 'x'.repeat(15 * 1024 * 1024), // 15MB string
+    };
+
+    expect(httpClient.validateResponseSize(oversizedResponse)).toBe(false);
+  });
+
+  test('should handle object data', () => {
+    const objectResponse = {
+      headers: {},
+      data: { key: 'value' },
+    };
+
+    expect(httpClient.validateResponseSize(objectResponse)).toBe(true);
   });
 });
 
@@ -251,6 +432,15 @@ describe('HTTP Security Configuration', () => {
       expect(hasNewline).toBe(true);
     }
   });
+
+  test('should export correct constants', () => {
+    expect(httpClient.DEFAULT_TIMEOUT_MS).toBe(10000);
+    expect(httpClient.MAX_TIMEOUT_MS).toBe(60000);
+    expect(httpClient.MIN_TIMEOUT_MS).toBe(1000);
+    expect(httpClient.MAX_RESPONSE_SIZE_BYTES).toBe(10 * 1024 * 1024);
+    expect(httpClient.MAX_REDIRECTS).toBe(5);
+    expect(httpClient.USER_AGENT).toContain('MasterClaw-CLI');
+  });
 });
 
 // =============================================================================
@@ -335,6 +525,40 @@ describe('HTTP Client SSRF Prevention', () => {
       // These should generate warnings about numeric components or internal patterns
       expect(result.warnings.length > 0 || !result.valid).toBe(true);
     }
+  });
+});
+
+// =============================================================================
+// HTTP Client Helper Functions Tests
+// =============================================================================
+
+describe('HTTP Client Helper Functions', () => {
+  test('withAudit should add audit flag to options', () => {
+    const options = { timeout: 5000 };
+    const result = httpClient.withAudit(options);
+    expect(result._audit).toBe(true);
+    expect(result.timeout).toBe(5000);
+  });
+
+  test('allowPrivateIPs should add private IP flag', () => {
+    const options = { timeout: 5000 };
+    const result = httpClient.allowPrivateIPs(options);
+    expect(result._allowPrivateIPs).toBe(true);
+    expect(result.timeout).toBe(5000);
+  });
+
+  test('withTimeout should clamp timeout values', () => {
+    // Too low
+    const tooLow = httpClient.withTimeout(100);
+    expect(tooLow.timeout).toBe(httpClient.MIN_TIMEOUT_MS);
+
+    // Too high
+    const tooHigh = httpClient.withTimeout(120000);
+    expect(tooHigh.timeout).toBe(httpClient.MAX_TIMEOUT_MS);
+
+    // Valid
+    const valid = httpClient.withTimeout(15000);
+    expect(valid.timeout).toBe(15000);
   });
 });
 

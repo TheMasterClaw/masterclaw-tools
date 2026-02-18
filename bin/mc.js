@@ -1298,6 +1298,9 @@ program
         console.log('');
         if (result.exitCode === 0) {
           console.log(chalk.green(`✅ Shell exited successfully`));
+        } else if (result.resourceViolation) {
+          console.log(chalk.red(`❌ Shell killed: ${result.resourceViolation.description}`));
+          console.log(chalk.cyan(`   💡 ${result.resourceViolation.suggestion}`));
         } else {
           console.log(chalk.yellow(`⚠️  Shell exited with code ${result.exitCode}`));
         }
@@ -1313,8 +1316,17 @@ program
         if (result.exitCode === 0) {
           console.log(chalk.gray(`\n✅ Completed in ${result.duration}ms`));
         } else {
-          console.log(chalk.yellow(`\n⚠️  Exit code: ${result.exitCode} (${result.duration}ms)`));
-          process.exit(result.exitCode);
+          // Check for resource limit violations
+          if (result.resourceViolation) {
+            console.log(chalk.red(`\n❌ Resource limit exceeded: ${result.resourceViolation.violationType}`));
+            console.log(chalk.yellow(`   ${result.resourceViolation.description}`));
+            console.log(chalk.cyan(`   💡 ${result.resourceViolation.suggestion}`));
+            console.log(chalk.gray(`   Exit code: ${result.exitCode} (${result.duration}ms)`));
+            process.exit(ExitCode.SECURITY_VIOLATION);
+          } else {
+            console.log(chalk.yellow(`\n⚠️  Exit code: ${result.exitCode} (${result.duration}ms)`));
+            process.exit(result.exitCode);
+          }
         }
       }
     } catch (error) {

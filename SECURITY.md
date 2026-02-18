@@ -99,6 +99,91 @@ Service resilience through circuit breakers:
 - **Automatic recovery** testing in half-open state
 - **Per-service isolation** - failures don't cascade
 - **Error rate monitoring** - opens at 60% error rate
+- **Graceful degradation** - fallback support for continued operation during outages
+
+#### Circuit Breaker Fallbacks
+
+When a circuit is open, services can degrade gracefully using fallbacks:
+
+```javascript
+// Static fallback value
+const result = await executeWithCircuit('payment-service',
+  async () => await processPayment(order),
+  { fallbackValue: { status: 'queued', message: 'Payment will be processed later' } }
+);
+
+// Dynamic fallback function (e.g., cached data)
+const result = await executeWithCircuit('user-service',
+  async () => await fetchUserProfile(userId),
+  { fallbackFn: async () => await getCachedProfile(userId) }
+);
+```
+
+**Benefits:**
+- **Continued operation** - Services remain functional during dependency outages
+- **Audit trail** - Fallback usage is logged for monitoring
+- **Metrics** - Track fallback frequency to identify chronic issues
+
+### 8. Secure HTTP Client 🆕
+
+The `lib/http-client.js` module provides a centralized, security-hardened HTTP client for all outbound requests:
+
+**Security Features:**
+| Feature | Protection |
+|---------|------------|
+| **SSRF Prevention** | Blocks requests to private IPs, internal hostnames, and suspicious domains |
+| **URL Scheme Validation** | Rejects `data:`, `file:`, and `javascript:` URLs |
+| **Header Injection Prevention** | Sanitizes headers to prevent CRLF injection attacks |
+| **Response Size Limits** | Prevents DoS via oversized responses (10MB max) |
+| **Timeout Enforcement** | Configurable timeouts with safe defaults (10s) and limits |
+| **Redirect Limiting** | Maximum 5 redirect hops to prevent redirect loops |
+| **Audit Logging** | All external calls logged with correlation IDs |
+
+**Usage:**
+```javascript
+const httpClient = require('./lib/http-client');
+
+// Simple GET request with SSRF protection
+const response = await httpClient.get('https://api.example.com/data');
+
+// POST request with audit logging
+const result = await httpClient.post(
+  'https://api.example.com/webhook',
+  { event: 'deployment' },
+  httpClient.withAudit({ timeout: 5000 })
+);
+
+// Allow private IPs for internal service calls
+const health = await httpClient.get(
+  'http://localhost:8000/health',
+  httpClient.allowPrivateIPs()
+);
+
+// Health check helper
+const status = await httpClient.healthCheck('https://api.example.com/health');
+// Returns: { healthy: true/false, status: 200, responseTime: 45, error: null }
+```
+
+**SSRF Protection by Default:**
+The client automatically blocks requests to:
+- Private IP ranges (`10.x.x.x`, `192.168.x.x`, `172.16-31.x.x`, `127.x.x.x`)
+- Link-local addresses (`169.254.x.x`)
+- Internal hostnames (`localhost`, `*.local`, `*.internal`, `*.lan`)
+- Suspicious patterns (IP-as-domain, hex-encoded IPs)
+
+To allow private IPs for legitimate internal service communication:
+```javascript
+await httpClient.get(url, httpClient.allowPrivateIPs());
+```
+
+**Audit Integration:**
+All external HTTP calls can be audited:
+```javascript
+// Log this request to the audit trail
+await httpClient.get(url, httpClient.withAudit());
+```
+
+Security violations (SSRF attempts, oversized responses) are automatically logged as `SECURITY_VIOLATION` events.
 
 ## 🐛 Reporting Vulnerabilities
 
@@ -143,6 +228,7 @@ We take security seriously. If you discover a vulnerability:
 ### For Developers
 
 - [ ] Use `wrapCommand()` for all new commands
+- [ ] Use `httpClient` for all outbound HTTP requests
 - [ ] Sanitize all user inputs with `sanitizeForLog()`
 - [ ] Mask sensitive data with `maskSensitiveData()`
 - [ ] Log security events via `logAudit()`

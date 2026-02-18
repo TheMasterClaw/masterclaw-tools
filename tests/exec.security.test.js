@@ -1,7 +1,7 @@
 /**
  * Tests for exec.js security hardening
  * Run with: npm test -- exec.security.test.js
- * 
+ *
  * These tests verify the security controls for container execution:
  * - Container name validation
  * - Command injection prevention
@@ -68,7 +68,7 @@ function createMockProcess(exitCode = 0, stdout = '', stderr = '') {
     }
   });
 
-  // Simulate stderr data events  
+  // Simulate stderr data events
   mockProcess.stderr.on.mockImplementation((event, callback) => {
     if (event === 'data' && stderr) {
       callback(Buffer.from(stderr));
@@ -397,7 +397,7 @@ describe('execInContainer Security', () => {
 
   test('logs audit event on execution', async () => {
     const { logAudit } = require('../lib/audit');
-    
+
     spawn.mockImplementation((cmd, args) => {
       if (cmd === 'docker' && args[0] === 'ps') {
         return createMockProcess(0, 'mc-core');
@@ -437,7 +437,7 @@ describe('shell Security', () => {
     });
 
     const allowedShells = ['sh', 'bash', 'ash', 'zsh'];
-    
+
     for (const shellName of allowedShells) {
       await expect(shell('mc-core', shellName)).resolves.toBeDefined();
     }
@@ -553,29 +553,29 @@ describe('Integration Security Tests', () => {
 
   test('all security errors have proper error codes', () => {
     const tests = [
-      { 
-        fn: () => validateAllowedContainer('evil-container'), 
-        code: 'CONTAINER_NOT_ALLOWED' 
+      {
+        fn: () => validateAllowedContainer('evil-container'),
+        code: 'CONTAINER_NOT_ALLOWED'
       },
-      { 
-        fn: () => validateCommand([]), 
-        code: 'INVALID_COMMAND_FORMAT' 
+      {
+        fn: () => validateCommand([]),
+        code: 'INVALID_COMMAND_FORMAT'
       },
-      { 
-        fn: () => validateCommand(['rm', '-rf', '/']), 
-        code: 'BLOCKED_COMMAND' 
+      {
+        fn: () => validateCommand(['rm', '-rf', '/']),
+        code: 'BLOCKED_COMMAND'
       },
-      { 
-        fn: () => validateCommand(['sh', '-c', 'rm -rf /']), 
-        code: 'BLOCKED_SUBCOMMAND' 
+      {
+        fn: () => validateCommand(['sh', '-c', 'rm -rf /']),
+        code: 'BLOCKED_SUBCOMMAND'
       },
-      { 
-        fn: () => validateCommand(['ls', 'file;rm -rf /']), 
-        code: 'COMMAND_INJECTION_ATTEMPT' 
+      {
+        fn: () => validateCommand(['ls', 'file;rm -rf /']),
+        code: 'COMMAND_INJECTION_ATTEMPT'
       },
-      { 
-        fn: () => validateCommand(['echo', 'a'.repeat(5000)]), 
-        code: 'COMMAND_TOO_LONG' 
+      {
+        fn: () => validateCommand(['echo', 'a'.repeat(5000)]),
+        code: 'COMMAND_TOO_LONG'
       },
     ];
 
@@ -879,7 +879,7 @@ describe('execInContainer Resource Limit Enforcement', () => {
     });
 
     // Find the docker exec call
-    const execCall = spawn.mock.calls.find(call => 
+    const execCall = spawn.mock.calls.find(call =>
       call[0] === 'docker' && call[1][0] === 'exec'
     );
     expect(execCall).toBeDefined();
@@ -914,7 +914,7 @@ describe('execInContainer Resource Limit Enforcement', () => {
     });
 
     // Find the docker exec call
-    const execCall = spawn.mock.calls.find(call => 
+    const execCall = spawn.mock.calls.find(call =>
       call[0] === 'docker' && call[1][0] === 'exec'
     );
     expect(execCall).toBeDefined();
@@ -941,13 +941,130 @@ describe('execInContainer Resource Limit Enforcement', () => {
       tty: true,
     });
 
-    const execCall = spawn.mock.calls.find(call => 
+    const execCall = spawn.mock.calls.find(call =>
       call[0] === 'docker' && call[1][0] === 'exec'
     );
 
     const dockerArgs = execCall[1];
     expect(dockerArgs).toContain('--ulimit');
     expect(dockerArgs).toContain('nproc=128:256');
+  });
+});
+
+// =============================================================================
+// Resource Limit Violation Detection Tests (NEW)
+// =============================================================================
+
+describe('Resource Limit Violation Detection', () => {
+  const { analyzeExitCode, detectOOMFromStderr, EXIT_CODES } = require('../lib/exec');
+
+  describe('analyzeExitCode', () => {
+    test('returns success for exit code 0', () => {
+      const result = analyzeExitCode(0);
+      expect(result.exitCode).toBe(0);
+      expect(result.isResourceViolation).toBe(false);
+      expect(result.violationType).toBeNull();
+    });
+
+    test('detects SIGKILL (137) as resource limit violation', () => {
+      const result = analyzeExitCode(EXIT_CODES.SIGKILL);
+      expect(result.exitCode).toBe(137);
+      expect(result.isResourceViolation).toBe(true);
+      expect(result.violationType).toBe('RESOURCE_LIMIT');
+      expect(result.description).toContain('forcefully killed');
+      expect(result.suggestion).toContain('memory');
+      expect(result.suggestion).toContain('256');
+    });
+
+    test('detects SIGXCPU (152) as CPU limit violation', () => {
+      const result = analyzeExitCode(EXIT_CODES.SIGXCPU);
+      expect(result.exitCode).toBe(152);
+      expect(result.isResourceViolation).toBe(true);
+      expect(result.violationType).toBe('CPU_LIMIT');
+      expect(result.description).toContain('CPU time limit');
+      expect(result.suggestion).toContain('too much CPU');
+    });
+
+    test('detects SIGXFSZ (153) as file size limit violation', () => {
+      const result = analyzeExitCode(EXIT_CODES.SIGXFSZ);
+      expect(result.exitCode).toBe(153);
+      expect(result.isResourceViolation).toBe(true);
+      expect(result.violationType).toBe('FILE_SIZE_LIMIT');
+      expect(result.description).toContain('File size limit');
+    });
+
+    test('detects SIGSYS (159) as blocked system call', () => {
+      const result = analyzeExitCode(EXIT_CODES.SIGSYS);
+      expect(result.exitCode).toBe(159);
+      expect(result.isResourceViolation).toBe(true);
+      expect(result.violationType).toBe('SYSTEM_CALL_BLOCKED');
+      expect(result.description).toContain('Blocked system call');
+    });
+
+    test('returns non-violation for generic error codes', () => {
+      const result = analyzeExitCode(1);
+      expect(result.exitCode).toBe(1);
+      expect(result.isResourceViolation).toBe(false);
+      expect(result.description).toContain('exited with code 1');
+    });
+
+    test('returns non-violation for exit code 2', () => {
+      const result = analyzeExitCode(2);
+      expect(result.isResourceViolation).toBe(false);
+    });
+  });
+
+  describe('detectOOMFromStderr', () => {
+    test('detects "killed process" message', () => {
+      expect(detectOOMFromStderr('Process killed process 1234')).toBe(true);
+    });
+
+    test('detects "out of memory" message', () => {
+      expect(detectOOMFromStderr('System is out of memory')).toBe(true);
+      expect(detectOOMFromStderr('Out of Memory occurred')).toBe(true);
+    });
+
+    test('detects "oom-kill" message', () => {
+      expect(detectOOMFromStderr('oom-kill: process 1234')).toBe(true);
+      expect(detectOOMFromStderr('OOM kill triggered')).toBe(true);
+    });
+
+    test('detects "cannot allocate memory" message', () => {
+      expect(detectOOMFromStderr('cannot allocate memory')).toBe(true);
+    });
+
+    test('detects "memory cgroup out of memory" message', () => {
+      expect(detectOOMFromStderr('memory cgroup out of memory')).toBe(true);
+    });
+
+    test('returns false for non-OOM stderr', () => {
+      expect(detectOOMFromStderr('Normal error message')).toBe(false);
+      expect(detectOOMFromStderr('Command not found')).toBe(false);
+      expect(detectOOMFromStderr('')).toBe(false);
+    });
+
+    test('returns false for null/undefined stderr', () => {
+      expect(detectOOMFromStderr(null)).toBe(false);
+      expect(detectOOMFromStderr(undefined)).toBe(false);
+    });
+  });
+
+  describe('EXIT_CODES constants', () => {
+    test('EXIT_CODES has expected values', () => {
+      expect(EXIT_CODES.SIGKILL).toBe(137);
+      expect(EXIT_CODES.SIGTERM).toBe(143);
+      expect(EXIT_CODES.SIGXCPU).toBe(152);
+      expect(EXIT_CODES.SIGXFSZ).toBe(153);
+      expect(EXIT_CODES.SIGSYS).toBe(159);
+    });
+
+    test('exit codes are calculated correctly (128 + signal)', () => {
+      expect(EXIT_CODES.SIGKILL).toBe(128 + 9);   // SIGKILL = 9
+      expect(EXIT_CODES.SIGTERM).toBe(128 + 15);  // SIGTERM = 15
+      expect(EXIT_CODES.SIGXCPU).toBe(128 + 24);  // SIGXCPU = 24
+      expect(EXIT_CODES.SIGXFSZ).toBe(128 + 25);  // SIGXFSZ = 25
+      expect(EXIT_CODES.SIGSYS).toBe(128 + 31);   // SIGSYS = 31
+    });
   });
 });
 

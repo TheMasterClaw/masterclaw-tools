@@ -45,6 +45,31 @@ MC_CORRELATION_ID=deploy-2024-001 mc deploy
 - **Security validated** — IDs sanitized to prevent log injection (max 64 chars, alphanumeric + `_-`)
 - **HTTP propagation** — Automatic `x-correlation-id` header for API calls
 
+### Secure HTTP Client 🆕
+
+All outbound HTTP requests are routed through a security-hardened client:
+
+```javascript
+const httpClient = require('./lib/http-client');
+
+// SSRF-protected GET request
+const response = await httpClient.get('https://api.example.com/data');
+
+// With audit logging
+const result = await httpClient.post(url, data, httpClient.withAudit());
+
+// Health check
+const status = await httpClient.healthCheck('https://api.example.com/health');
+```
+
+**Security Features:**
+- **SSRF Protection** — Blocks private IPs, internal hostnames, suspicious domains
+- **URL Scheme Validation** — Rejects `data:`, `file:`, `javascript:` URLs
+- **Header Injection Prevention** — Sanitizes headers, blocks CRLF injection
+- **Response Size Limits** — Prevents DoS via oversized responses (10MB max)
+- **Timeout Enforcement** — Safe defaults with configurable limits
+- **Audit Logging** — All external calls tracked with correlation IDs
+
 **Usage in code:**
 ```javascript
 const { 
@@ -138,6 +163,14 @@ mc circuits --reset-all  # Reset all circuits
 - Reset timeout: 15 seconds before attempting recovery
 - Success threshold: 2 consecutive successes to close
 - Error rate threshold: 60%
+
+**Fallback Support (Graceful Degradation):**
+When a circuit is open, the CLI can use fallback mechanisms to maintain partial functionality:
+- **Static fallback values** — Return cached or default data instead of failing
+- **Fallback functions** — Execute alternative logic (e.g., read from cache)
+- **Audit logging** — All fallback usage is tracked for monitoring
+
+This enables graceful degradation where services continue operating with reduced functionality during outages, rather than complete failure.
 
 ### Prototype Pollution Protection
 Config operations are protected against prototype pollution attacks:
