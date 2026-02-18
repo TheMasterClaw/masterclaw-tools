@@ -60,6 +60,32 @@ All user inputs are validated and sanitized:
 | **Commands** | Dangerous characters filtered, blocked command list |
 | **Environment Variables** | Prototype pollution keys rejected |
 | **Log Entries** | Control characters sanitized |
+| **Contact Names** | Max 100 chars, special char ratio limits |
+| **Contact Values** | Email/phone/URL format validation |
+| **Export Filenames** | Path traversal prevention, basename extraction |
+
+### Contacts Security
+
+The `mc contacts` command implements comprehensive input validation:
+
+**Input Validation:**
+- **Names**: Max 100 chars, control character rejection, special character ratio limits
+- **Emails**: RFC 5322 format validation
+- **Phone numbers**: International format support with character filtering
+- **URLs**: Scheme validation (http/https only), prevents javascript: URLs
+- **Tags**: Alphanumeric with hyphens only, max 50 chars
+- **Search queries**: Regex special character sanitization, max 200 chars
+
+**Export Security:**
+- **Path traversal prevention**: Filenames sanitized to basename only
+- **CSV injection protection**: Formula characters (`=`, `+`, `-`, `@`) prefixed with single quote
+- **Markdown sanitization**: Contact data escaped for safe markdown rendering
+
+**Data Sanitization:**
+- All loaded contacts are sanitized to prevent injection from tampered files
+- Truncation of oversized fields (DoS prevention)
+- Filtering of invalid contact methods and tags
+- Default category fallback for invalid inputs
 
 ### 4. Container Execution Security
 
