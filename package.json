@@ -1,6 +1,6 @@
 {
   "name": "masterclaw-tools",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "CLI utilities for MasterClaw - command your AI familiar from the terminal",
   "main": "bin/mc.js",
   "bin": {
@@ -33,7 +33,10 @@
     "wizard",
     "workflow",
     "automation",
-    "playbook"
+    "playbook",
+    "kubernetes",
+    "k8s",
+    "helm"
   ],
   "author": "Rex deus",
   "license": "MIT",

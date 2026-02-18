@@ -74,6 +74,7 @@ const { workflowCmd } = require('../lib/workflow');
 const dashboardCmd = require('../lib/dashboard');
 const webhookCmd = require('../lib/webhook');
 const restartCmd = require('../lib/restart');
+const k8sCmd = require('../lib/k8s');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -83,7 +84,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.44.0')  // Feature: Added mc restart command for graceful service restart with health checking
+  .version('0.45.0')  // Feature: Added mc k8s command for Kubernetes deployment management
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -178,6 +179,7 @@ program.addCommand(workflowCmd);
 program.addCommand(dashboardCmd);
 program.addCommand(webhookCmd);
 program.addCommand(restartCmd);
+program.addCommand(k8sCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing

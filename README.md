@@ -1408,6 +1408,80 @@ mc deploy status               # Show current deployment status
 mc deploy history              # Show deployment history
 ```
 
+### `mc k8s` 🆕
+Kubernetes deployment management — deploy, manage, and monitor MasterClaw on Kubernetes clusters using kubectl, Kustomize, or Helm.
+
+```bash
+# Deploy to Kubernetes
+mc k8s deploy                   # Interactive deployment
+mc k8s deploy -e prod           # Deploy to production environment
+mc k8s deploy -e dev -m helm    # Deploy using Helm
+mc k8s deploy --dry-run         # Preview deployment without applying
+
+# View deployment status
+mc k8s status                   # Show pods, deployments, services
+mc k8s status -n masterclaw     # Specify namespace
+
+# View and manage logs
+mc k8s logs                     # View logs from all pods
+mc k8s logs -c core             # View specific component logs
+mc k8s logs -c core -f          # Follow logs in real-time
+mc k8s logs --since 1h          # Logs from last hour
+
+# Execute commands in pods
+mc k8s exec -c core             # Open shell in core pod
+mc k8s exec -c core --command "python --version"  # Run specific command
+
+# Port forwarding
+mc k8s port-forward -s core -l 8000 -r 8000  # Forward core service to localhost:8000
+
+# Scale deployments
+mc k8s scale -c core -r 5       # Scale core to 5 replicas
+
+# Update/rolling restart
+mc k8s update                   # Restart all deployments
+mc k8s update -c backend        # Restart specific component
+
+# Delete deployment
+mc k8s delete -e prod           # Delete from production
+
+# Cluster information
+mc k8s cluster-info             # Show cluster details
+```
+
+**Features:**
+- **Multiple deployment methods** — Kustomize overlays or Helm charts
+- **Environment management** — dev, staging, prod overlays
+- **Interactive prompts** — Guided deployment when options not specified
+- **Namespace support** — Deploy to any Kubernetes namespace
+- **Pod management** — View logs, execute commands, port forward
+- **Scaling** — Scale deployments up or down
+- **Rolling updates** — Zero-downtime rolling restarts
+
+**Prerequisites:**
+- kubectl installed and configured
+- Access to a Kubernetes cluster
+- MasterClaw infrastructure with k8s manifests
+
+**Example Workflow:**
+```bash
+# 1. Deploy to development
+mc k8s deploy -e dev
+
+# 2. Check status
+mc k8s status
+
+# 3. View core logs
+mc k8s logs -c core -f
+
+# 4. Scale up for production
+mc k8s deploy -e prod
+mc k8s scale -c core -r 3
+
+# 5. Port forward for local testing
+mc k8s port-forward -s core -l 8000 -r 8000
+```
+
 ### `mc logs`
 Comprehensive log management and viewing
 
