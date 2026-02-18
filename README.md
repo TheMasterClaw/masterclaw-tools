@@ -398,6 +398,79 @@ MC_JSON_OUTPUT=1 mc validate        # JSON output for automation
 
 ## Commands
 
+### `mc quickstart` 🆕
+Interactive project bootstrap wizard for new MasterClaw projects. Creates a complete project structure with sensible defaults.
+
+```bash
+# Interactive mode
+mc quickstart                    # Prompts for project name and options
+mc quickstart my-project         # Use specified project name
+
+# Non-interactive mode
+mc quickstart my-project --yes   # Use all defaults
+
+# Template selection
+mc quickstart my-project --template minimal   # Bare essentials
+mc quickstart my-project --template standard  # Recommended (default)
+mc quickstart my-project --template complete  # Full-featured
+
+# Additional options
+mc quickstart my-project --skip-docker        # Skip Docker setup
+mc quickstart my-project --skip-git           # Skip git initialization
+mc quickstart my-project -d ~/projects        # Create in specific directory
+```
+
+**Templates:**
+
+| Template | Description | Includes |
+|----------|-------------|----------|
+| `minimal` | Bare essentials | Basic config, environment setup |
+| `standard` | Recommended setup | Docker Compose, monitoring, sample memories |
+| `complete` | Full-featured | All above + backup scripts, CI/CD, health checks |
+
+**Interactive Prompts:**
+- Project name validation (letters, numbers, hyphens, underscores)
+- Template selection with feature preview
+- LLM provider choice (OpenAI, Anthropic, Google, Ollama)
+- Docker Compose setup option
+- Git initialization option
+
+**Generated Structure:**
+```
+my-project/
+├── .env                    # Environment configuration
+├── .env.example            # Example environment file
+├── .gitignore             # Git ignore rules
+├── README.md              # Project documentation
+├── config.json            # MasterClaw configuration
+├── docker-compose.yml     # Docker setup (if selected)
+├── backups/               # Backup storage
+├── data/                  # Application data
+├── docs/                  # Documentation
+├── logs/                  # Log files
+├── memory/                # Memory files
+│   └── welcome.md         # Sample memory
+├── scripts/               # Utility scripts
+└── skills/                # Custom skills
+```
+
+**Example:**
+```bash
+# Create a new project interactively
+mc quickstart
+# ? Project name: my-ai-project
+# ? Choose a project template: Standard
+# ? Set up Docker Compose? Yes
+# ? Initialize git repository? Yes
+# ? Primary LLM provider: OpenAI
+
+# Quick start with defaults
+mc quickstart my-project --yes
+cd my-project
+docker-compose up -d
+mc status
+```
+
 ### `mc info` 🆕
 Show comprehensive system information — versions, paths, features, and configuration summary.
 

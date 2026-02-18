@@ -44,7 +44,7 @@ const { verifyAuditIntegrity, rotateSigningKey } = require('../lib/audit');
 const securityMonitor = require('../lib/security-monitor');
 const rateLimiter = require('../lib/rate-limiter');
 const ssl = require('../lib/ssl');
-const { execInContainer, getRunningContainers, shell, ALLOWED_CONTAINERS } = require('../lib/exec');
+const { execInContainer, getRunningContainers } = require('../lib/exec');
 const { runDoctor } = require('../lib/doctor');
 const benchmark = require('../lib/benchmark');
 const depsValidator = require('../lib/deps-validator');
@@ -52,7 +52,7 @@ const { envCmd } = require('../lib/env-manager');
 const { runSmokeTests, runQuickSmokeTest } = require('../lib/smoke-test');
 const maintenance = require('../lib/maintenance');
 const configCmd = require('../lib/config-cmd');
-const { getAllCircuitStatus, resetAllCircuits, CircuitState } = require('../lib/circuit-breaker');
+const { getAllCircuitStatus, resetAllCircuits } = require('../lib/circuit-breaker');
 const { secretsCmd } = require('../lib/secrets');
 const contextCmd = require('../lib/context');
 const performance = require('../lib/performance');
@@ -65,6 +65,7 @@ const { pluginCmd, getInstalledPlugins, executePlugin } = require('../lib/plugin
 const clientCmd = require('../lib/client');
 const disasterCmd = require('../lib/disaster');
 const { contactsCmd } = require('../lib/contacts');
+const { runQuickstart } = require('../lib/quickstart');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -74,7 +75,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.35.0')  // Feature: Added contacts management command (mc contacts)
+  .version('0.36.0')  // Feature: Added quickstart wizard (mc quickstart)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -87,7 +88,7 @@ program
   .command('status')
   .description('Check health of all MasterClaw services')
   .option('-w, --watch', 'watch mode - continuous monitoring')
-  .action(wrapCommand(async (options) => {
+  .action(wrapCommand(async (_options) => {
     console.log(chalk.blue('🐾 MasterClaw Status\n'));
 
     const statuses = await getAllStatuses();
@@ -261,6 +262,22 @@ program
   .action(wrapCommand(async (options) => {
     await info.showInfo(options);
   }, 'info'));
+
+// =============================================================================
+// Quickstart Command - Project Bootstrap Wizard
+// =============================================================================
+
+program
+  .command('quickstart [project-name]')
+  .description('Interactive project bootstrap wizard for new MasterClaw projects')
+  .option('-t, --template <name>', 'Use a specific template (minimal, standard, complete)', 'standard')
+  .option('-d, --directory <path>', 'Parent directory for the project', '.')
+  .option('--skip-docker', 'Skip Docker Compose setup')
+  .option('--skip-git', 'Skip git initialization')
+  .option('-y, --yes', 'Use defaults without prompting')
+  .action(wrapCommand(async (projectName, options) => {
+    await runQuickstart(projectName, options);
+  }, 'quickstart'));
 
 // =============================================================================
 // Doctor Command - Comprehensive Diagnostics
@@ -443,11 +460,6 @@ program
     const {
       validateCommandDeps,
       validateCustomDeps,
-      validateDocker,
-      validateDockerCompose,
-      validateInfraDir,
-      validateDiskSpace,
-      validateMemory,
       DependencyType
     } = depsValidator;
 
@@ -549,7 +561,7 @@ program
   .command('chat <message>')
   .description('Send a quick message to MasterClaw')
   .option('--no-stream', 'disable streaming response (if supported)')
-  .action(wrapCommand(async (message, options) => {
+  .action(wrapCommand(async (message, _options) => {
     // Security: Validate and sanitize input
     const { validateChatInput, sanitizeChatInput } = require('../lib/chat-security');
 
@@ -778,7 +790,7 @@ program
 // Audit Log Viewer Commands
 // =============================================================================
 
-const { queryAuditLog, getSecuritySummary, AuditEventType, Severity } = require('../lib/audit');
+const { queryAuditLog, getSecuritySummary } = require('../lib/audit');
 
 program
   .command('audit')
@@ -970,18 +982,14 @@ program
         process.exit(ExitCode.SECURITY_VIOLATION);
       }
 
-      try {
-        await rateLimiter.resetRateLimits(options.resetAll ? null : options.reset, true);
-        console.log(chalk.green('✅ Rate limits reset successfully'));
-        if (options.reset) {
-          console.log(chalk.gray(`   Reset command: ${options.reset}`));
-        } else {
-          console.log(chalk.gray('   Reset all commands'));
-        }
-        return;
-      } catch (err) {
-        throw err;
+      await rateLimiter.resetRateLimits(options.resetAll ? null : options.reset, true);
+      console.log(chalk.green('✅ Rate limits reset successfully'));
+      if (options.reset) {
+        console.log(chalk.gray(`   Reset command: ${options.reset}`));
+      } else {
+        console.log(chalk.gray('   Reset all commands'));
       }
+      return;
     }
 
     // Default: show status
@@ -1359,7 +1367,7 @@ program
   .command('containers')
   .description('List running MasterClaw containers')
   .option('-a, --all', 'Show all containers including stopped', false)
-  .action(wrapCommand(async (options) => {
+  .action(wrapCommand(async (_options) => {
     console.log(chalk.blue('🐾 MasterClaw Containers\n'));
 
     const containers = await getRunningContainers();
@@ -1460,17 +1468,17 @@ program
   // Load and register plugins before parsing
   try {
     const plugins = await getInstalledPlugins();
-    
+
     for (const plugin of plugins) {
       if (!plugin.enabled || !plugin.installed || !plugin.manifest) {
         continue;
       }
-      
+
       const commandName = plugin.manifest.command || plugin.command;
       if (!commandName) {
         continue;
       }
-      
+
       // Register the plugin as a top-level command
       program
         .command(commandName)
@@ -1484,10 +1492,10 @@ program
   } catch (error) {
     // Silently fail - plugins are optional
   }
-  
+
   // Now parse the command line
   program.parse();
-  
+
   // Show help if no command provided
   if (!process.argv.slice(2).length) {
     program.outputHelp();

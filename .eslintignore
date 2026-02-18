@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Coverage reports
+coverage/
+
+# Generated files
+clients/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+.cache/
