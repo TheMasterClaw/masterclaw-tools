@@ -9,45 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Test Coverage (400+ tests across 19 test suites)
+#### Test Coverage (450+ tests across 23 test suites)
 
 - **tests/terraform.test.js** (29 tests) - Terraform infrastructure management
-  - Environment validation, CLI detection, output parsing
-  - Path traversal prevention, command injection protection
-  
 - **tests/notify.test.js** (24 tests) - Notification management
-  - Channel validation, webhook URL security
-  - Phone number format validation, malicious input sanitization
-  
 - **tests/restore.test.js** (28 tests) - Disaster recovery restore
-  - Backup filename validation, date parsing
-  - Path traversal prevention, restore safety mechanisms
-  
 - **tests/workflow.test.js** (33 tests) - Workflow automation
-  - Command whitelist enforcement, command safety validation
-  - Workflow hash calculation for integrity verification
-  
 - **tests/template.test.js** (25 tests) - Template generation
-  - Security validation, null/undefined handling
-  - Token generation, input sanitization
-  
 - **tests/context.test.js** (18 tests) - Context management
-  - Path traversal prevention, file operations
-  - Context file validation
-  
 - **tests/webhook.test.js** (25 tests) - Webhook management
-  - Security validation, URL validation
-  - Alert configuration tests
-  
 - **tests/scan.test.js** (20 tests) - Security scanning
-  - Vulnerability detection, input validation
-  - Security hardening tests
-  
 - **tests/alias.test.js** (20 tests) - Alias management
-  - Command validation, alias security
-  - Name validation tests
-  
 - **tests/logs.test.js** (25 tests) - Log management
+- **tests/doctor.test.js** (20 tests) - System diagnostics
+- **tests/env-manager.test.js** (20 tests) - Environment management
+- **tests/deps.test.js** (20 tests) - Dependency management
+- **tests/whoami.test.js** (20 tests) - User context
+- **tests/events.test.js** (20 tests) - Event tracking
+- **tests/audit.test.js** (35 tests) - Audit logging
+- **tests/troubleshoot.test.js** (20 tests) - Troubleshooting
+- **tests/exec.test.js** (25 tests) - Container execution
+- **tests/rate-limiter.test.js** (20 tests) - Rate limiting
+- **tests/docker.test.js** (34 tests) - Docker container security
+- **tests/cost.test.js** (22 tests) - Cost management
+- **tests/plugin.test.js** (22 tests) - Plugin system
+- **tests/config.test.js** (20 tests) - Configuration management
+- **tests/backup.test.js** (20 tests) - Backup management
+- **tests/search.test.js** (20 tests) - Search functionality
+- **tests/integration.test.js** (14 tests) - Cross-module integration
   - Log operations, error handling
   - Security validation
   
@@ -149,9 +138,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Summary of Changes
 
 This release focuses on:
-1. **Test Coverage**: Added 400+ tests across 19 test suites
+1. **Test Coverage**: Added 450+ tests across 26 test suites
 2. **Security**: Fixed vulnerabilities and added security validations
 3. **Code Quality**: Fixed linting issues and removed unused code
-4. **Documentation**: Updated README and LINTING guides
+4. **Documentation**: Updated README, LINTING, and CHANGELOG
 
 All 80 library modules now have corresponding test coverage.
