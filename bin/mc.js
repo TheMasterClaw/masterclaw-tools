@@ -90,6 +90,7 @@ const doctorCmd = require('../lib/doctor-cmd');
 const healthCmd = require('../lib/health');
 const logsCmd = require('../lib/logs');
 const statusCmd = require('../lib/status-cmd');
+const testCmd = require('../lib/test-cmd');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -203,6 +204,7 @@ program.addCommand(whoamiCmd);
 program.addCommand(doctorCmd);
 program.addCommand(logsCmd);
 program.addCommand(statusCmd);
+program.addCommand(testCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
 program.addCommand(sloCmd);
