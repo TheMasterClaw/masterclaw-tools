@@ -158,6 +158,7 @@ The `lib/http-client.js` module provides a centralized, security-hardened HTTP c
 | Feature | Protection |
 |---------|------------|
 | **SSRF Prevention** | Blocks requests to private IPs, internal hostnames, and suspicious domains |
+| **DNS Rebinding Protection** | Validates resolved IP addresses to prevent DNS rebinding attacks |
 | **URL Scheme Validation** | Rejects `data:`, `file:`, and `javascript:` URLs |
 | **Header Injection Prevention** | Sanitizes headers to prevent CRLF injection attacks |
 | **Response Size Limits** | Prevents DoS via oversized responses (10MB max) |
@@ -165,11 +166,23 @@ The `lib/http-client.js` module provides a centralized, security-hardened HTTP c
 | **Redirect Limiting** | Maximum 5 redirect hops to prevent redirect loops |
 | **Audit Logging** | All external calls logged with correlation IDs |
 
+#### DNS Rebinding Protection
+
+DNS rebinding is a sophisticated attack where:
+1. An attacker controls a domain that initially resolves to a public IP (passing hostname-based SSRF checks)
+2. After the DNS TTL expires, the domain resolves to a private/internal IP
+3. The attacker can now access internal services that should be protected
+
+MasterClaw's HTTP client protects against DNS rebinding by:
+- Performing DNS resolution before making the request
+- Validating that resolved IP addresses are not private (unless explicitly allowed)
+- Logging DNS rebinding attempts as CRITICAL security violations
+
 **Usage:**
 ```javascript
 const httpClient = require('./lib/http-client');
 
-// Simple GET request with SSRF protection
+// Protected against DNS rebinding - validates resolved IPs
 const response = await httpClient.get('https://api.example.com/data');
 
 // POST request with audit logging

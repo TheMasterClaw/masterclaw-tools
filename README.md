@@ -64,11 +64,33 @@ const status = await httpClient.healthCheck('https://api.example.com/health');
 
 **Security Features:**
 - **SSRF Protection** — Blocks private IPs, internal hostnames, suspicious domains
+- **DNS Rebinding Protection** — Validates resolved IP addresses to prevent DNS rebinding attacks (dual-validate: hostname + resolved IP)
 - **URL Scheme Validation** — Rejects `data:`, `file:`, `javascript:` URLs
 - **Header Injection Prevention** — Sanitizes headers, blocks CRLF injection
 - **Response Size Limits** — Prevents DoS via oversized responses (10MB max)
 - **Timeout Enforcement** — Safe defaults with configurable limits
 - **Audit Logging** — All external calls tracked with correlation IDs
+
+**DNS Rebinding Protection:**
+DNS rebinding attacks occur when an attacker controls a domain that:
+1. Initially resolves to a public IP (bypassing hostname-based SSRF checks)
+2. After the DNS TTL expires, resolves to a private/internal IP
+3. Allows the attacker to access internal services
+
+MasterClaw protects against this by performing DNS resolution and validating that resolved IPs are not private, unless explicitly allowed:
+
+```javascript
+const httpClient = require('./lib/http-client');
+
+// Protected against DNS rebinding - validates resolved IPs
+const response = await httpClient.get('https://api.example.com/data');
+
+// For internal services, explicitly allow private IPs
+const internalResponse = await httpClient.get(
+  'http://internal-service:8080/health',
+  httpClient.allowPrivateIPs()
+);
+```
 
 **Usage in code:**
 ```javascript
