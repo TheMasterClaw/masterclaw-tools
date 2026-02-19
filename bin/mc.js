@@ -79,6 +79,7 @@ const cacheCmd = require('../lib/cache');
 const scanCmd = require('../lib/scan');
 const { runHeal } = require('../lib/heal');
 const sloCmd = require('../lib/slo');
+const opsCmd = require('../lib/ops');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -88,7 +89,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.48.0')  // Feature: Cost budget alerts with automated monitoring
+  .version('0.49.0')  // Feature: Unified operational dashboard (mc ops)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -187,6 +188,7 @@ program.addCommand(k8sCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
 program.addCommand(sloCmd);
+program.addCommand(opsCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing

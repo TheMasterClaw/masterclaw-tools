@@ -1321,6 +1321,90 @@ Checks performed:
 - SSL certificate expiration
 - Infrastructure health checks
 
+### `mc ops` 🆕
+Unified operational dashboard — "single pane of glass" view of all MasterClaw health metrics. Aggregates service status, recent errors, SSL certificates, backups, costs, and security findings into one comprehensive dashboard.
+
+```bash
+# Show full operational dashboard
+mc ops
+
+# Compact view for cron/terminals
+mc ops --compact
+
+# Watch mode - auto-refresh every 30 seconds
+mc ops --watch
+mc ops --watch --interval 10     # Custom refresh interval
+
+# Show only items needing attention
+mc ops --alerts-only
+
+# Exit with non-zero code if critical issues found (for scripting)
+mc ops --exit-code
+
+# Export to JSON for automation
+mc ops --export json
+```
+
+**Dashboard Components:**
+| Component | Information Displayed |
+|-----------|----------------------|
+| **Services** | Health status and response times for all MasterClaw services |
+| **Recent Errors** | Latest error entries from logs (last hour) |
+| **SSL Certificate** | Days until expiry, expiration date |
+| **Backups** | Time since last backup, total backup count |
+| **Costs** | Current spend vs monthly budget, daily estimate |
+| **Security** | Vulnerability counts (critical/high/medium), last scan time |
+| **System Resources** | Disk usage, memory usage, load average |
+
+**Example Output:**
+```
+🐾 MasterClaw Operational Dashboard
+   2/19/2026, 12:15:30 AM
+
+Overall Health Score: ✅ 95/100
+
+📱 Services
+──────────────────────────────────────────────────
+  ✅ Interface     healthy
+  ✅ Backend API   healthy (45ms)
+  ✅ AI Core       healthy (120ms)
+  ✅ Gateway       healthy
+
+🔒 SSL Certificate
+──────────────────────────────────────────────────
+  ✅ Expires in 45 days (2025-04-05)
+
+💾 Backups
+──────────────────────────────────────────────────
+  ✅ Last backup: 2h ago (7 total)
+
+💰 Costs
+──────────────────────────────────────────────────
+  ✅ $12.50 / $100.00 (12.5%)
+
+🛡️  Security
+──────────────────────────────────────────────────
+  ✅ 0 critical, 0 high, 5 medium
+     Last scan: 24h ago
+
+🖥️  System Resources
+──────────────────────────────────────────────────
+  ✅ Disk: 35% used (120GB free)
+     Memory: 42% used
+     Load: 0.75
+```
+
+**Use Cases:**
+- **Morning standup** — Quick operational health check
+- **Post-deployment** — Verify all systems are healthy
+- **Alert triage** — `mc ops --alerts-only` to see issues
+- **Monitoring integration** — `mc ops --export json` for dashboards
+- **Watch mode** — Live monitoring during maintenance
+
+**Exit codes:**
+- `0` — All systems healthy or only warnings
+- `1` — Critical issues detected (with `--exit-code`)
+
 ### `mc check` 🆕
 Pre-flight dependency validation — check that command dependencies are satisfied before execution with actionable remediation steps.
 
