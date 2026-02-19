@@ -89,7 +89,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.49.0')  // Feature: Unified operational dashboard (mc ops)
+  .version('0.50.0')  // Feature: Log rotation command (mc logs rotate)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -387,66 +387,6 @@ program
       process.exit(ExitCode.GENERAL_ERROR);
     }
   }, 'heal'));
-
-// Doctor command - comprehensive diagnostics
-program
-  .command('doctor')
-  .description('Run comprehensive diagnostics')
-  .action(wrapCommand(async () => {
-    console.log(chalk.blue('🔬 MasterClaw Doctor\n'));
-
-    const checks = [
-      { name: 'Docker', check: docker.isDockerAvailable },
-      { name: 'Docker Compose', check: docker.isComposeAvailable },
-      { name: 'Services', check: getAllStatuses },
-    ];
-
-    let passedChecks = 0;
-    let failedChecks = 0;
-
-    for (const { name, check } of checks) {
-      process.stdout.write(`Checking ${name}... `);
-      try {
-        await check();
-        console.log(chalk.green('✅'));
-        passedChecks++;
-      } catch (err) {
-        console.log(chalk.red('❌'));
-        if (process.env.MC_VERBOSE) {
-          console.log(chalk.gray(`   Error: ${err.message}`));
-        }
-        failedChecks++;
-      }
-    }
-
-    // Config security check
-    process.stdout.write('Checking config security... ');
-    try {
-      const audit = await config.securityAudit();
-      if (audit.secure) {
-        console.log(chalk.green('✅'));
-        passedChecks++;
-      } else {
-        console.log(chalk.yellow('⚠️'));
-        console.log(chalk.gray(`   Issues: ${audit.issues.join(', ')}`));
-        failedChecks++;
-      }
-    } catch (err) {
-      console.log(chalk.red('❌'));
-      if (process.env.MC_VERBOSE) {
-        console.log(chalk.gray(`   Error: ${err.message}`));
-      }
-      failedChecks++;
-    }
-
-    console.log('');
-    console.log(chalk.cyan(`Results: ${chalk.green(`${passedChecks} passed`)}, ${chalk.red(`${failedChecks} failed`)}`));
-
-    if (failedChecks > 0) {
-      console.log(chalk.gray('\nRun with --verbose for more details'));
-      process.exit(ExitCode.GENERAL_ERROR);
-    }
-  }, 'doctor'));
 
 // Check command - dependency validation with actionable remediation
 program
