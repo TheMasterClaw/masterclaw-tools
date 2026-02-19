@@ -1657,6 +1657,166 @@ mc k8s scale -c core -r 3
 mc k8s port-forward -s core -l 8000 -r 8000
 ```
 
+### `mc terraform` 🆕
+**Terraform Infrastructure Management** — Deploy and manage MasterClaw infrastructure on AWS using Infrastructure as Code. Provides a convenient CLI wrapper around Terraform operations.
+
+```bash
+# Show Terraform status
+mc terraform status               # Show status for dev environment
+mc terraform status -e prod       # Show status for production
+
+# List available environments
+mc terraform env
+
+# Initialize Terraform
+mc terraform init                 # Initialize dev environment
+mc terraform init -e staging      # Initialize staging
+mc terraform init -e prod --upgrade  # Initialize with provider upgrades
+
+# Validate configuration
+mc terraform validate -e dev      # Validate dev configuration
+
+# Plan changes
+mc terraform plan -e dev          # Show execution plan
+mc terraform plan -e prod -o plan.out  # Save plan to file
+
+# Apply changes
+mc terraform apply -e dev         # Apply changes (with confirmation)
+mc terraform apply -e dev --auto-approve  # Apply without confirmation
+mc terraform apply -e prod -p plan.out    # Apply saved plan
+
+# Destroy infrastructure (USE WITH CAUTION)
+mc terraform destroy -e dev       # Destroy dev environment
+mc terraform destroy -e prod      # Requires explicit confirmation
+
+# Get outputs and connection details
+mc terraform output -e dev        # Show all outputs
+mc terraform output -e prod --json   # Output as JSON
+mc terraform output -e dev --raw cluster_endpoint  # Get specific value
+
+# Configure kubectl
+mc terraform kubeconfig -e dev    # Configure kubectl for dev cluster
+mc terraform kubeconfig -e prod --region us-west-2  # With custom region
+
+# View state
+mc terraform state -e dev         # List resources in state
+```
+
+**Supported Environments:**
+| Environment | Purpose | Default Workspace |
+|-------------|---------|-------------------|
+| `dev` | Development and testing | dev |
+| `staging` | Pre-production validation | staging |
+| `prod` | Production deployment | prod |
+
+**Features:**
+- **Environment Management** — Switch between dev, staging, and prod seamlessly
+- **Safety First** — Production destruction requires explicit confirmation
+- **Validation** — Pre-flight checks before operations
+- **kubectl Integration** — Automatic kubeconfig setup for EKS clusters
+- **Structured Output** — JSON support for automation and scripting
+
+**Prerequisites:**
+- Terraform >= 1.0 installed
+- AWS CLI configured with appropriate credentials
+- Access to terraform/environments/ directory
+
+**Example Workflow:**
+```bash
+# 1. Check status
+mc terraform status -e dev
+
+# 2. Initialize (first time only)
+mc terraform init -e dev
+
+# 3. Validate configuration
+mc terraform validate -e dev
+
+# 4. Review the plan
+mc terraform plan -e dev
+
+# 5. Apply changes
+mc terraform apply -e dev
+
+# 6. Get connection details
+mc terraform output -e dev
+
+# 7. Configure kubectl
+mc terraform kubeconfig -e dev
+
+# 8. Verify deployment
+kubectl get nodes
+mc k8s status
+```
+
+**Exit Codes:**
+- `0` — Success
+- `2` — Invalid arguments
+- `7` — Configuration error
+- `9` — Validation failed
+
+### `mc template` 🆕
+**Configuration Template Generator** — Generate starter configuration files for new MasterClaw setups. Useful for onboarding and creating consistent configurations.
+
+```bash
+# List available templates
+mc template list
+
+# Generate a template
+mc template generate env                    # Create .env file
+mc template generate docker-override        # Create docker-compose.override.yml
+mc template generate terraform-vars         # Create terraform.tfvars
+mc template generate service                # Create custom service definition
+mc template generate monitoring             # Create monitoring config
+mc template generate backup                 # Create backup configuration
+
+# Interactive mode with prompts
+mc template generate env --interactive
+
+# Specify output file
+mc template generate env -o .env.production
+
+# Force overwrite existing
+mc template generate env --force
+
+# Show template preview
+mc template show env
+
+# Interactive wizard
+mc template wizard
+```
+
+**Available Templates:**
+| Template | Output File | Purpose |
+|----------|-------------|---------|
+| `env` | `.env` | Complete environment configuration |
+| `docker-override` | `docker-compose.override.yml` | Local development overrides |
+| `terraform-vars` | `terraform.tfvars` | AWS infrastructure variables |
+| `service` | `service-definition.yml` | Custom service template |
+| `monitoring` | `monitoring-config.yml` | Prometheus/Grafana rules |
+| `backup` | `backup-config.yml` | Cloud backup settings |
+
+**Features:**
+- **Interactive Mode**: Prompts for required values
+- **Smart Defaults**: Sensible defaults based on environment type
+- **Token Generation**: Auto-generates secure gateway tokens
+- **Validation Ready**: Generated configs work with `mc validate`
+
+**Example Workflow:**
+```bash
+# 1. Generate production environment file
+mc template generate env --interactive
+# ? Domain name: mc.example.com
+# ? Admin email: admin@example.com
+# ? OpenAI API Key: sk-...
+
+# 2. Validate the configuration
+mc validate
+
+# 3. Deploy
+mc deploy rolling
+```
+
 ### `mc logs`
 Comprehensive log management and viewing
 

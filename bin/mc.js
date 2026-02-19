@@ -81,6 +81,9 @@ const { runHeal } = require('../lib/heal');
 const sloCmd = require('../lib/slo');
 const opsCmd = require('../lib/ops');
 const { version: versionCmd } = require('../lib/version');
+const { terraformCmd } = require('../lib/terraform');
+const { templateCmd } = require('../lib/template');
+const apiMaintenanceCmd = require('../lib/api-maintenance');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -90,7 +93,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.52.0')  // Feature: Unified version command (mc version)
+  .version('0.55.0')  // Feature: API Maintenance command (mc api-maintenance)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -186,6 +189,9 @@ program.addCommand(dashboardCmd);
 program.addCommand(webhookCmd);
 program.addCommand(restartCmd);
 program.addCommand(k8sCmd);
+program.addCommand(terraformCmd);
+program.addCommand(templateCmd);
+program.addCommand(apiMaintenanceCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
 program.addCommand(sloCmd);
