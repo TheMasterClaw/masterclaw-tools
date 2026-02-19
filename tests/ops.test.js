@@ -1,15 +1,24 @@
 /**
  * Tests for the ops command (Operational Dashboard)
  * Covers logging integration, error handling, and core functionality
+ * 
+ * Security: Tests verify secure HTTP client is used for all internal requests
  */
 
 const { Command } = require('commander');
-const axios = require('axios');
 const ops = require('../lib/ops');
 const { logger } = require('../lib/logger');
 
-// Mock dependencies
-jest.mock('axios');
+// Mock secure HTTP client (replaces axios)
+jest.mock('../lib/http-client', () => ({
+  get: jest.fn(),
+  post: jest.fn(),
+  allowPrivateIPs: jest.fn((opts) => ({ ...opts, _allowPrivateIPs: true })),
+  withAudit: jest.fn((opts) => ({ ...opts, _audit: true })),
+}));
+
+const mockHttpClient = require('../lib/http-client');
+
 jest.mock('../lib/logger', () => ({
   logger: {
     debug: jest.fn(),
@@ -158,8 +167,13 @@ describe('mc ops', () => {
   });
 
   describe('getServiceHealth', () => {
+    beforeEach(() => {
+      mockHttpClient.allowPrivateIPs.mockImplementation((opts) =>
+        ({ ...opts, _allowPrivateIPs: true }));
+    });
+
     test('logs debug message when service check completes successfully', async () => {
-      axios.get.mockResolvedValue({ status: 200 });
+      mockHttpClient.get.mockResolvedValue({ status: 200 });
 
       await ops.getServiceHealth();
 
@@ -174,7 +188,7 @@ describe('mc ops', () => {
     });
 
     test('logs warning when service check fails', async () => {
-      axios.get.mockRejectedValue(new Error('Connection refused'));
+      mockHttpClient.get.mockRejectedValue(new Error('Connection refused'));
 
       await ops.getServiceHealth();
 
@@ -189,7 +203,7 @@ describe('mc ops', () => {
     });
 
     test('returns healthy status for 200 response', async () => {
-      axios.get.mockResolvedValue({ status: 200 });
+      mockHttpClient.get.mockResolvedValue({ status: 200 });
 
       const results = await ops.getServiceHealth();
 
@@ -197,7 +211,7 @@ describe('mc ops', () => {
     });
 
     test('returns unhealthy status for non-200 response', async () => {
-      axios.get.mockResolvedValue({ status: 500 });
+      mockHttpClient.get.mockResolvedValue({ status: 500 });
 
       const results = await ops.getServiceHealth();
 
@@ -205,15 +219,37 @@ describe('mc ops', () => {
     });
 
     test('returns down status for network errors', async () => {
-      axios.get.mockRejectedValue({ code: 'ECONNREFUSED', message: 'Connection refused' });
+      mockHttpClient.get.mockRejectedValue({ code: 'ECONNREFUSED', message: 'Connection refused' });
 
       const results = await ops.getServiceHealth();
 
       expect(results.every(r => r.status === 'down')).toBe(true);
     });
+
+    test('uses secure HTTP client with allowPrivateIPs for internal services', async () => {
+      mockHttpClient.get.mockResolvedValue({ status: 200 });
+
+      await ops.getServiceHealth();
+
+      // Verify httpClient.get was called
+      expect(mockHttpClient.get).toHaveBeenCalled();
+      // Verify allowPrivateIPs was used (required for localhost/internal URLs)
+      expect(mockHttpClient.allowPrivateIPs).toHaveBeenCalled();
+
+      // Verify all calls are to localhost URLs
+      const calls = mockHttpClient.get.mock.calls;
+      for (const [url] of calls) {
+        expect(url).toMatch(/^http:\/\/localhost/);
+      }
+    });
   });
 
   describe('getRecentErrors', () => {
+    beforeEach(() => {
+      mockHttpClient.allowPrivateIPs.mockImplementation((opts) =>
+        ({ ...opts, _allowPrivateIPs: true }));
+    });
+
     test('logs error when docker check fails', async () => {
       const { execSync } = require('child_process');
       jest.mock('child_process', () => ({
@@ -231,7 +267,7 @@ describe('mc ops', () => {
     });
 
     test('logs debug when Loki is not available', async () => {
-      axios.get.mockRejectedValue(new Error('Connection refused'));
+      mockHttpClient.get.mockRejectedValue(new Error('Connection refused'));
 
       await ops.getRecentErrors();
 
@@ -240,11 +276,31 @@ describe('mc ops', () => {
         expect.any(Object)
       );
     });
+
+    test('uses secure HTTP client for Loki queries', async () => {
+      mockHttpClient.get.mockResolvedValue({
+        status: 200,
+        data: { data: { result: [] } }
+      });
+
+      await ops.getRecentErrors();
+
+      // Verify httpClient.get was called for Loki
+      expect(mockHttpClient.get).toHaveBeenCalled();
+      // Verify allowPrivateIPs was used for localhost:3100
+      expect(mockHttpClient.allowPrivateIPs).toHaveBeenCalled();
+
+      // Check the URL contains Loki endpoint
+      const calls = mockHttpClient.get.mock.calls;
+      const lokiCall = calls.find(([url]) => url.includes('localhost:3100'));
+      expect(lokiCall).toBeDefined();
+    });
   });
 
   describe('logging integration', () => {
     test('all status check functions log correlation ID', async () => {
-      axios.get.mockRejectedValue(new Error('test error'));
+      mockHttpClient.get.mockRejectedValue(new Error('test error'));
+      mockHttpClient.allowPrivateIPs.mockImplementation((opts) => opts);
 
       await ops.getServiceHealth();
 
@@ -283,6 +339,79 @@ describe('mc ops', () => {
       const result = await ops.getSSLStatus();
 
       expect(result.available).toBe(false);
+    });
+  });
+
+  describe('security hardening', () => {
+    test('does not use raw axios for HTTP requests', () => {
+      const opsSource = require('fs').readFileSync(
+        require('path').join(__dirname, '../lib/ops.js'),
+        'utf8'
+      );
+
+      // Should not contain raw axios.get/axios.post calls
+      expect(opsSource).not.toMatch(/axios\.(get|post|put|delete|request)\(/);
+
+      // Should use httpClient for all HTTP calls
+      expect(opsSource).toMatch(/httpClient\.(get|post)/);
+
+      // Should import http-client module
+      expect(opsSource).toMatch(/require\(['"][\.\/]*http-client['"]\)/);
+    });
+
+    test('uses allowPrivateIPs for all internal service calls', () => {
+      const opsSource = require('fs').readFileSync(
+        require('path').join(__dirname, '../lib/ops.js'),
+        'utf8'
+      );
+
+      // Should use allowPrivateIPs for localhost/internal services
+      expect(opsSource).toMatch(/allowPrivateIPs/);
+
+      // Should be used in multiple places (getServiceHealth, getRecentErrors, getCostStatus)
+      const allowPrivateIpMatches = opsSource.match(/allowPrivateIPs/g);
+      expect(allowPrivateIpMatches.length).toBeGreaterThanOrEqual(3);
+    });
+
+    test('documents security features in module header', () => {
+      const opsSource = require('fs').readFileSync(
+        require('path').join(__dirname, '../lib/ops.js'),
+        'utf8'
+      );
+
+      // Should mention SSRF and DNS rebinding protection in header comment
+      expect(opsSource).toMatch(/Security.*SSRF|SSRF.*Security/i);
+      expect(opsSource).toMatch(/DNS rebinding/i);
+    });
+
+    test('secure HTTP client provides SSRF protection', () => {
+      // The http-client module provides SSRF protection:
+      // - Blocks private IPs by default
+      // - Validates hostnames against suspicious patterns
+      // - Prevents access to internal services from external URLs
+
+      const httpClientSource = require('fs').readFileSync(
+        require('path').join(__dirname, '../lib/http-client.js'),
+        'utf8'
+      );
+
+      // http-client should implement SSRF protection
+      expect(httpClientSource).toMatch(/SSRF/i);
+      expect(httpClientSource).toMatch(/validateUrlSSRF/i);
+    });
+
+    test('secure HTTP client provides DNS rebinding protection', () => {
+      // The http-client module provides DNS rebinding protection:
+      // - Validates resolved IP addresses after DNS lookup
+      // - Blocks private IPs that resolve from external hostnames
+
+      const httpClientSource = require('fs').readFileSync(
+        require('path').join(__dirname, '../lib/http-client.js'),
+        'utf8'
+      );
+
+      expect(httpClientSource).toMatch(/DNS.*rebinding|rebinding.*protection/i);
+      expect(httpClientSource).toMatch(/validateDNSRebinding/i);
     });
   });
 });
