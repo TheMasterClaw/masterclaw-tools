@@ -2,6 +2,12 @@
 
 CLI utilities, automation scripts, health checks, and maintenance tools for the MasterClaw ecosystem.
 
+## Documentation 📚
+
+- **[CLI Reference](docs/cli-reference.md)** - Complete command reference and examples
+- **[Security Guide](SECURITY.md)** - Security features and best practices
+- **[Improvement History](IMPROVEMENT.md)** - Detailed improvement summaries
+
 ## Installation
 
 ```bash
