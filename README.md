@@ -3470,19 +3470,37 @@ npm test -- error-handler.test.js
 npm test -- --coverage
 ```
 
-### Security Test Suites
+### Test Suites Overview
 
-| Test File | Coverage |
-|-----------|----------|
-| `docker.security.test.js` | Docker command validation, container security |
-| `exec.security.test.js` | **Container execution security** — `mc exec` command hardening |
-| `config.security.test.js` | Config file permissions, prototype pollution protection |
-| `secrets.test.js` | **Secrets management** — Secure API key and token handling |
-| `services.security.test.js` | Service health check security |
-| `audit.integrity.test.js` | Audit log signing and tamper detection |
-| `security-monitor.test.js` | Threat detection algorithms |
-| `rate-limiter.test.js` | Command rate limiting |
-| `error-handler.test.js` | Error classification and safe error messages |
+| Test File | Tests | Coverage Area |
+|-----------|-------|---------------|
+| `docker.security.test.js` | 20+ | Docker command validation, container security |
+| `exec.security.test.js` | 25+ | **Container execution security** — `mc exec` command hardening |
+| `terraform.test.js` | 29 | **Infrastructure management** — Environment validation, CLI detection |
+| `notify.test.js` | 24 | **Notification management** — Channel security, webhook validation |
+| `restore.test.js` | 28 | **Disaster recovery** — Backup validation, path traversal prevention |
+| `workflow.test.js` | 33 | **Workflow automation** — Command whitelist, injection prevention |
+| `template.test.js` | 25 | **Template generation** — Input sanitization, null handling |
+| `context.test.js` | 18 | **Context management** — Path safety, file operations |
+| `webhook.test.js` | 25 | **Webhook management** — Security validation |
+| `scan.test.js` | 20 | **Security scanning** — Vulnerability detection |
+| `alias.test.js` | 20 | **Alias management** — Command validation |
+| `logs.test.js` | 25 | **Log management** — Log operations |
+| `doctor.test.js` | 20 | **System diagnostics** — Health checking |
+| `env-manager.test.js` | 20 | **Environment management** — Config validation |
+| `deps.test.js` | 20 | **Dependency management** — Package security |
+| `whoami.test.js` | 20 | **User context** — System information |
+| `events.test.js` | 20 | **Event tracking** — Event validation |
+| `audit.test.js` | 35 | **Audit logging** — HMAC signatures, tamper detection |
+| `config.security.test.js` | 20+ | Config file permissions, prototype pollution protection |
+| `secrets.test.js` | 15+ | **Secrets management** — Secure API key and token handling |
+| `services.security.test.js` | 15+ | Service health check security |
+| `audit.integrity.test.js` | 15+ | Audit log signing and tamper detection |
+| `security-monitor.test.js` | 15+ | Threat detection algorithms |
+| `rate-limiter.test.js` | 10+ | Command rate limiting |
+| `error-handler.test.js` | 20+ | Error classification and safe error messages |
+
+**Total: 400+ tests across 25+ test suites**
 
 ### exec.security.test.js — Container Execution Security
 
