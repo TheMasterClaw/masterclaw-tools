@@ -69,6 +69,41 @@ npx eslint lib/ bin/ --fix
 
 ## Common Issues and Fixes
 
+### Unused Variables and Imports
+
+**Problem:**
+```javascript
+const chalk = require('chalk');  // imported but never used
+const path = require('path');     // imported but never used
+
+function foo() {
+  const unused = 'value';         // assigned but never used
+  return 'bar';
+}
+```
+
+**Fix:**
+```javascript
+// Remove unused imports
+const { spawn } = require('child_process');
+
+function foo() {
+  return 'bar';
+}
+```
+
+### Unnecessary Escape Characters
+
+**Problem:**
+```javascript
+const pattern = new RegExp(`\\\`${cmd}\\b`);  // unnecessary escaping
+```
+
+**Fix:**
+```javascript
+const pattern = new RegExp(`\`${cmd}\\b`);   // correct escaping
+```
+
 ### Unused Variables
 
 **Problem:**
