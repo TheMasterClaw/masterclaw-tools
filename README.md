@@ -1817,6 +1817,60 @@ mc validate
 mc deploy rolling
 ```
 
+### `mc troubleshoot` 🆕
+**Troubleshooting Guide and Diagnostic Assistant** — Interactive wizard for diagnosing and fixing common MasterClaw issues. Provides guided solutions with executable commands.
+
+```bash
+# Start interactive troubleshooting wizard
+mc troubleshoot wizard
+
+# List all common issues
+mc troubleshoot list
+
+# Filter by category or severity
+mc troubleshoot list --category docker
+mc troubleshoot list --severity critical
+
+# Show detailed guide for specific issue
+mc troubleshoot guide services-down
+mc troubleshoot guide ssl-cert-issues
+mc troubleshoot guide high-memory-usage
+
+# Run quick diagnostics
+mc troubleshoot diagnose
+```
+
+**Available Issue Categories:**
+| Category | Issues Covered |
+|----------|----------------|
+| `docker` | Services not starting, container issues |
+| `ssl` | Certificate problems, HTTPS issues |
+| `performance` | High memory, slow response times |
+| `database` | Connection problems, data persistence |
+| `api` | LLM API errors, rate limits |
+| `backup` | Backup failures, cloud sync issues |
+| `notifications` | Alert delivery problems |
+
+**Features:**
+- **Interactive Wizard**: Step-by-step diagnosis with prompts
+- **Solution Commands**: One-click execution of fixes
+- **Prevention Tips**: Learn how to avoid issues
+- **Severity Levels**: Critical, High, Medium, Low
+- **Category Filter**: Focus on specific areas
+
+**Example Workflow:**
+```bash
+# Services are down - start wizard
+mc troubleshoot wizard
+# ? What area: docker
+# ? Which issue: Services Not Starting
+# Shows symptoms, diagnosis steps, and solutions
+# Execute: mc revive to restart services
+
+# Or go directly to a known issue
+mc troubleshoot guide database-issues
+```
+
 ### `mc logs`
 Comprehensive log management and viewing
 

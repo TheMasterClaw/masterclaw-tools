@@ -17,7 +17,7 @@ const path = require('path');
 
 const { getAllStatuses, findInfraDir } = require('../lib/services');
 const config = require('../lib/config');
-const docker = require('../lib/docker');
+const _docker = require('../lib/docker');
 const memory = require('../lib/memory');
 const task = require('../lib/task');
 const { session } = require('../lib/session');
@@ -83,6 +83,7 @@ const opsCmd = require('../lib/ops');
 const { version: versionCmd } = require('../lib/version');
 const { terraformCmd } = require('../lib/terraform');
 const { templateCmd } = require('../lib/template');
+const { troubleshootCmd } = require('../lib/troubleshoot');
 const apiMaintenanceCmd = require('../lib/api-maintenance');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
@@ -93,7 +94,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.55.0')  // Feature: API Maintenance command (mc api-maintenance)
+  .version('0.56.0')  // Feature: Troubleshooting guide and diagnostic assistant (mc troubleshoot)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -191,6 +192,7 @@ program.addCommand(restartCmd);
 program.addCommand(k8sCmd);
 program.addCommand(terraformCmd);
 program.addCommand(templateCmd);
+program.addCommand(troubleshootCmd);
 program.addCommand(apiMaintenanceCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
@@ -384,11 +386,11 @@ program
       json: options.json,
       categories: options.category || [],
     });
-    
+
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     }
-    
+
     // Exit with error if there are unfixable critical issues
     const hasCritical = result.nonFixableIssues?.some(i => i.severity === 'critical');
     if (hasCritical || (!options.fix && result.fixes?.length > 0)) {
