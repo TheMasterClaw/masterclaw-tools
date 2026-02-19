@@ -1820,6 +1820,16 @@ mc logs export --since 24h     # Export logs from last 24 hours
 mc logs search "ERROR"         # Search for pattern in all logs
 mc logs search "error" backend -i  # Case-insensitive search in backend
 
+# Real-time Log Streaming via Core API (SSE) 🆕
+mc logs stream                      # Stream all logs in real-time
+mc logs stream --service core       # Stream core service logs
+mc logs stream --service backend    # Stream backend logs
+mc logs stream --level ERROR        # Only ERROR and above
+mc logs stream --search "database"  # Filter by search pattern
+mc logs stream --since 10m          # Include last 10 minutes
+mc logs stream --no-follow          # Historical only, don't stream
+mc logs stream --json               # Output raw JSON
+
 # Loki Log Aggregation Queries (requires monitoring stack)
 mc logs query                  # Follow all logs via Loki
 mc logs query backend          # Query logs for specific service
@@ -1833,7 +1843,15 @@ mc logs query --labels         # List available Loki labels
 
 **Services:** `traefik`, `interface`, `backend`, `core`, `gateway`, `chroma`, `watchtower`, or `all` (default)
 
-**Note:** `mc logs query` requires the monitoring stack (Loki) to be running. Start it with `make monitor`.
+**Log Streaming Features:**
+- 🔄 Real-time streaming via Server-Sent Events (SSE)
+- 🎯 Service and log level filtering
+- 🔍 Full-text search within messages
+- 📊 Includes both historical and live logs
+- 🌈 Color-coded output by log level
+- 📡 No monitoring stack required (uses Core API)
+
+**Note:** `mc logs query` requires the monitoring stack (Loki) to be running. Start it with `make monitor`. `mc logs stream` uses the Core API and works without Loki.
 
 ### `mc backup` 🆕
 Comprehensive backup management — create, list, analyze, and clean up backups
