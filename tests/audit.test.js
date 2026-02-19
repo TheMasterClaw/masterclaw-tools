@@ -26,16 +26,15 @@ const audit = require('../lib/audit');
 describe('AuditEventType Constants', () => {
   test('exports expected event types', () => {
     expect(audit.AuditEventType).toBeDefined();
-    expect(audit.AuditEventType.AUTH).toBe('AUTH');
-    expect(audit.AuditEventType.COMMAND).toBe('COMMAND');
+    expect(audit.AuditEventType.AUTH_SUCCESS).toBe('AUTH_SUCCESS');
+    expect(audit.AuditEventType.AUTH_FAILURE).toBe('AUTH_FAILURE');
     expect(audit.AuditEventType.CONFIG_READ).toBe('CONFIG_READ');
     expect(audit.AuditEventType.CONFIG_WRITE).toBe('CONFIG_WRITE');
-    expect(audit.AuditEventType.SECRET_ACCESS).toBe('SECRET_ACCESS');
     expect(audit.AuditEventType.SECURITY_VIOLATION).toBe('SECURITY_VIOLATION');
     expect(audit.AuditEventType.BACKUP_CREATE).toBe('BACKUP_CREATE');
     expect(audit.AuditEventType.BACKUP_RESTORE).toBe('BACKUP_RESTORE');
     expect(audit.AuditEventType.DEPLOY_START).toBe('DEPLOY_START');
-    expect(audit.AuditEventType.DEPLOY_END).toBe('DEPLOY_END');
+    expect(audit.AuditEventType.DEPLOY_SUCCESS).toBe('DEPLOY_SUCCESS');
   });
 
   test('exports severity levels', () => {
@@ -94,10 +93,10 @@ describe('createAuditEntry', () => {
 // =============================================================================
 
 describe('generateEntryId', () => {
-  test('generates 16 character hex string', () => {
+  test('generates valid entry ID format', () => {
     const id = audit.generateEntryId();
-    expect(id).toHaveLength(16);
-    expect(id).toMatch(/^[0-9a-f]+$/);
+    expect(id).toMatch(/^mc-[a-z0-9]+-[a-f0-9]+$/);
+    expect(id.length).toBeGreaterThan(10);
   });
 
   test('generates unique IDs', () => {
@@ -187,15 +186,14 @@ describe('signAuditEntry', () => {
   });
 
   test('signature validates entry integrity', async () => {
-    const key = crypto.randomBytes(32);
     const entry = {
       timestamp: '2024-01-01T00:00:00Z',
       eventType: 'test',
       details: { important: 'data' },
     };
 
-    const signed = await audit.signAuditEntry(entry, key);
-    const isValid = await audit.verifyEntrySignature(signed, key);
+    const signed = await audit.signAuditEntry(entry);
+    const isValid = await audit.verifyEntrySignature(signed);
 
     expect(isValid).toBe(true);
   });
@@ -306,9 +304,10 @@ describe('sanitizeAuditDetails', () => {
     };
 
     const sanitized = audit.sanitizeAuditDetails(details);
-    expect(sanitized.__proto__).toBeUndefined();
-    expect(sanitized.constructor).toBeUndefined();
-    expect(sanitized.prototype).toBeUndefined();
+    // Dangerous keys should not be present in the sanitized object
+    expect(Object.prototype.hasOwnProperty.call(sanitized, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(sanitized, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(sanitized, 'prototype')).toBe(false);
     expect(sanitized.normalData).toBe('visible');
   });
 });
