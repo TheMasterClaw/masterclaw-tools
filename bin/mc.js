@@ -85,6 +85,7 @@ const { terraformCmd } = require('../lib/terraform');
 const { templateCmd } = require('../lib/template');
 const { troubleshootCmd } = require('../lib/troubleshoot');
 const apiMaintenanceCmd = require('../lib/api-maintenance');
+const whoamiCmd = require('../lib/whoami');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -194,6 +195,7 @@ program.addCommand(terraformCmd);
 program.addCommand(templateCmd);
 program.addCommand(troubleshootCmd);
 program.addCommand(apiMaintenanceCmd);
+program.addCommand(whoamiCmd);
 program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
 program.addCommand(sloCmd);
