@@ -2225,6 +2225,12 @@ mc config import ./backup-config.json    # Import from file (interactive)
 mc config import ./config.json --force   # Import without confirmation
 mc config import ./config.json --dry-run # Preview changes
 
+# Compare configuration
+mc config diff                           # Compare current config with defaults
+mc config diff --example ./config.example.json  # Compare against example file
+mc config diff --json                    # Output as JSON
+mc config diff --no-mask                 # Show actual values (not masked)
+
 # Reset configuration
 mc config reset                          # Reset to defaults (with confirmation)
 mc config reset --force                  # Skip confirmation
@@ -2236,7 +2242,34 @@ mc config reset --force                  # Skip confirmation
 - **Security masking** — Sensitive values (tokens, passwords) are masked by default
 - **Safe export** — Exports mask sensitive values; use `--no-mask` only when necessary
 - **Import preview** — Shows diff before applying changes
+- **Config diff** — Compare current config with defaults or example files
 - **Rate limiting** — Set and import operations are rate-limited for security
+
+**Diff Command:**
+The `mc config diff` command helps identify configuration drift:
+```bash
+# See what's different from defaults
+$ mc config diff
+
+🐾 Configuration Diff
+
+📝 Modified Values
+  gateway.url:
+    Current:   "https://gw.example.com"
+    Default:   "http://localhost:3000"
+  defaults.backupRetention:
+    Current:   14
+    Default:   7
+
+➕ Only in Current Config
+  custom.setting: "my-value"
+
+📊 Summary
+  Modified:   2
+  Added:      1
+  Missing:    0
+  Same:       4
+```
 
 **Configuration Schema:**
 ```json
@@ -3152,6 +3185,59 @@ const configHealth = await securityMonitor.monitorConfiguration();
 - **Suspicious Activity**: Reconnaissance and after-hours activity detection
 - **Configuration Drift**: File permission and hash-based change detection
 - **Automated Response**: High-severity threats automatically logged to audit trail
+
+### `mc version` 🆕
+
+Unified version management across the MasterClaw ecosystem — shows versions of all components with update checking.
+
+```bash
+# Show version information
+mc version                          # Display all component versions
+mc version --json                   # Output as JSON
+mc version --check-updates          # Check for available updates
+mc version --all                    # Show detailed version info
+
+# Check for updates
+mc version check                    # Check updates, exit with code if available
+mc version check --quiet            # Silent check (CI/CD)
+
+# Compare versions
+mc version compare 1.0.0 1.1.0      # Compare two version strings
+```
+
+**Example Output:**
+```
+🐾 MasterClaw Version Information
+
+Components:
+  CLI Tools:       0.52.0
+  AI Core:         0.48.2 (running)
+  Backend API:     0.31.0 (running)
+  Web Interface:   0.25.1 (running)
+  Infrastructure:  v1.2.0 (main)
+
+Updates:
+  ✓ All components are up to date
+```
+
+**Features:**
+- **Component Detection** — Automatically detects versions from package.json, git tags, and running services
+- **Update Checking** — Queries npm registry and git to find newer versions
+- **Compatibility Matrix** — Shows which components are running vs installed
+- **CI/CD Integration** — JSON output and exit codes for automation
+- **Semantic Versioning** — Compares versions correctly with `v` prefix handling
+
+**Use Cases:**
+```bash
+# Daily check-in
+mc version --check-updates
+
+# Pre-deployment validation
+mc version --json | jq '.components.core.version'
+
+# CI/CD pipeline gate
+mc version check --quiet || echo "Updates available"
+```
 
 ## Testing 🧪
 

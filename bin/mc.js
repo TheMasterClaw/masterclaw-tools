@@ -80,6 +80,7 @@ const scanCmd = require('../lib/scan');
 const { runHeal } = require('../lib/heal');
 const sloCmd = require('../lib/slo');
 const opsCmd = require('../lib/ops');
+const { version: versionCmd } = require('../lib/version');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -89,7 +90,7 @@ const program = new Command();
 program
   .name('mc')
   .description('MasterClaw CLI - Command your AI familiar')
-  .version('0.50.0')  // Feature: Log rotation command (mc logs rotate)
+  .version('0.52.0')  // Feature: Unified version command (mc version)
   .option('-v, --verbose', 'verbose output')
   .option('-i, --infra-dir <path>', 'path to infrastructure directory');
 
@@ -189,6 +190,7 @@ program.addCommand(cacheCmd);
 program.addCommand(scanCmd.program);
 program.addCommand(sloCmd);
 program.addCommand(opsCmd);
+program.addCommand(versionCmd);
 
 // =============================================================================
 // Benchmark Commands - Performance Testing
