@@ -198,6 +198,153 @@ When a circuit is open, the CLI can use fallback mechanisms to maintain partial 
 - **Fallback functions** — Execute alternative logic (e.g., read from cache)
 - **Audit logging** — All fallback usage is tracked for monitoring
 
+## Agent Hub & Swarm 🤖🐝
+
+MasterClaw now includes **multi-agent orchestration** with WebSocket-based real-time communication between humans (Rex) and AI agents.
+
+### Agent Hub (WebSocket Server)
+
+Start the WebSocket agent hub for direct agent communication:
+
+```bash
+# Start the hub
+mc agent hub start
+mc agent hub start --port 8765 --token my-secret-token
+
+# Check hub status
+mc agent hub status
+
+# List connected agents
+mc agent list
+```
+
+**Features:**
+- **Real-time bidirectional messaging** — WebSocket protocol for instant communication
+- **Agent presence tracking** — Know which agents are online and their status
+- **Room-based conversations** — 1:1 direct messages or group chat rooms
+- **Message history** — Persistent conversation history with pagination
+- **Security** — JWT authentication, rate limiting, input validation
+- **Health endpoints** — HTTP health checks and metrics for monitoring
+
+### Agent Swarm
+
+Orchestrate multiple agents working together on complex tasks:
+
+```bash
+# Initialize a swarm
+mc agent swarm init
+mc agent swarm init --topology mesh --consensus byzantine
+
+# Run a task through the swarm
+mc agent swarm run "Implement user authentication"
+mc agent swarm run "Refactor the database layer" --agent architect --max-turns 15
+
+# Run with consensus (parallel execution)
+mc agent swarm run "Security audit" --parallel
+
+# Check swarm status
+mc agent swarm status
+```
+
+**Swarm Topologies:**
+| Topology | Description | Best For |
+|----------|-------------|----------|
+| `hierarchical` | Queen coordinates workers | Clear chain of command |
+| `mesh` | Peer-to-peer collaboration | Creative problem solving |
+| `ring` | Circular message passing | Load balancing |
+| `star` | Central hub | Broadcasting |
+
+**Consensus Algorithms:**
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| `leader` | Queen decides | Fast decision making |
+| `majority` | Simple vote | Quick agreement |
+| `weighted` | Expert-weighted votes | Technical decisions |
+| `byzantine` | Fault-tolerant (2/3 majority) | Critical operations |
+
+**Pre-built Agent Types:**
+- **Coder** — Writes and refactors code
+- **Reviewer** — Code review and quality checks
+- **Tester** — Test generation and QA
+- **Architect** — System design and decisions
+- **Security** — Security audits and fixes
+
+### Usage Metering & Billing
+
+Track usage for SaaS billing:
+
+```bash
+# Check quota status
+mc billing quota
+mc billing quota --user rex
+
+# Generate usage report
+mc billing report
+mc billing report --start 2025-01-01 --end 2025-01-31 --format csv
+
+# Manage subscription tiers
+mc billing tier
+mc billing tier --set pro
+```
+
+**Subscription Tiers:**
+| Tier | Price | Messages/Day | Agents | Swarms |
+|------|-------|--------------|--------|--------|
+| Free | $0 | 100 | 1 | 0 |
+| Starter | $9/mo | 1,000 | 5 | 2 |
+| Pro | $49/mo | 10,000 | 20 | 10 |
+| Enterprise | $299/mo | Unlimited | Unlimited | Unlimited |
+
+**Tracked Metrics:**
+- Messages sent/received
+- Agent executions and token usage
+- Swarm tasks completed
+- API calls
+- Storage usage
+
+### JavaScript API
+
+```javascript
+const { getHub } = require('./lib/agent-hub');
+const { getSwarm, Swarm } = require('./lib/agent-swarm');
+const { getMetering } = require('./lib/metering');
+
+// Start Agent Hub
+const hub = getHub({ port: 8765 });
+await hub.start();
+
+// Listen for messages
+hub.on('message', ({ from, content, roomId }) => {
+  console.log(`[${roomId}] ${from.userId}: ${content}`);
+});
+
+// Message an agent
+await hub.messageAgent('coder-1', 'Write a function to validate emails');
+
+// Initialize Swarm
+const swarm = getSwarm({ topology: 'hierarchical' });
+await swarm.init();
+
+// Create and add agents
+const coder = Swarm.createCoderAgent({ name: 'SeniorCoder' });
+const reviewer = Swarm.createReviewerAgent();
+swarm.addAgent(coder, true); // Queen
+swarm.addAgent(reviewer);
+
+// Run a task
+const result = await swarm.run({
+  agent: coder,
+  messages: [{ role: 'user', content: 'Implement OAuth2 login' }],
+  maxTurns: 10,
+  debug: true,
+});
+
+// Track usage
+const metering = getMetering();
+await metering.init();
+metering.recordEvent('message.sent', { userId: 'rex', tokens: 150 });
+```
+
 This enables graceful degradation where services continue operating with reduced functionality during outages, rather than complete failure.
 
 ### Prototype Pollution Protection

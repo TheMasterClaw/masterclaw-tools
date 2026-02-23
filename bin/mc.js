@@ -91,6 +91,7 @@ const healthCmd = require('../lib/health');
 const logsCmd = require('../lib/logs');
 const statusCmd = require('../lib/status-cmd');
 const testCmd = require('../lib/test-cmd');
+const { createAgentCommand } = require('../lib/agent-cmd');
 
 // Setup global error handlers for uncaught exceptions and unhandled rejections
 setupGlobalErrorHandlers();
@@ -1379,6 +1380,12 @@ program
       await performance.showSummary();
     }
   }, 'performance'));
+
+// =============================================================================
+// Agent Hub and Swarm Commands - Multi-agent orchestration
+// =============================================================================
+
+program.addCommand(createAgentCommand());
 
 // =============================================================================
 // Log Analysis Command - Intelligent log analysis and anomaly detection
