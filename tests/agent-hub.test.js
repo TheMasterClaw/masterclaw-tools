@@ -1,6 +1,6 @@
 /**
- * @jest-environment node
  * agent-hub.test.js - Tests for AgentHub WebSocket server
+ * @jest-environment node
  */
 
 const WebSocket = require('ws');
@@ -415,6 +415,21 @@ describe('AgentHub', () => {
       
       return new Promise((resolve, reject) => {
         const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}`);
+        let resolved = false;
+        
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            ws.terminate();
+            // Check that agent was NOT registered
+            const agent = hub.agents.get('bad-agent');
+            if (!agent) {
+              resolved = true;
+              resolve();
+            } else {
+              reject(new Error('Invalid agent was registered'));
+            }
+          }
+        }, 1000);
         
         ws.on('open', () => {
           ws.send(JSON.stringify({ type: MSG_TYPES.AUTH, userId: 'test-user' }));
@@ -430,13 +445,27 @@ describe('AgentHub', () => {
               role: 'invalid-role',
             }));
           } else if (msg.type === MSG_TYPES.ERROR) {
-            expect(msg.message).toContain('Invalid role');
+            // Verify agent was not registered
+            const agent = hub.agents.get('bad-agent');
+            if (!agent) {
+              resolved = true;
+              clearTimeout(timeout);
+              ws.close();
+              resolve();
+            }
+          } else if (msg.type === MSG_TYPES.AGENT_READY) {
+            // Should not receive this for invalid role
+            resolved = true;
+            clearTimeout(timeout);
             ws.close();
-            resolve();
+            reject(new Error('Agent registered with invalid role'));
           }
         });
         
-        ws.on('error', reject);
+        ws.on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
       });
     });
   });

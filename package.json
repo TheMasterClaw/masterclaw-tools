@@ -61,7 +61,7 @@
     "js-yaml": "^4.1.0",
     "node-fetch": "^2.7.0",
     "ora": "^5.4.1",
-    "ws": "^8.16.0"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

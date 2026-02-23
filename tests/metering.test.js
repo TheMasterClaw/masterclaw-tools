@@ -208,8 +208,8 @@ describe('Metering', () => {
       await metering.init();
     });
 
-    test('should set user tier', () => {
-      metering.setUserTier('user-1', 'pro');
+    test('should set user tier', async () => {
+      await metering.setUserTier('user-1', 'pro');
       
       expect(metering.getUserTier('user-1')).toBe('pro');
     });
@@ -218,21 +218,21 @@ describe('Metering', () => {
       expect(metering.getUserTier('unknown-user')).toBe('free');
     });
 
-    test('should reject invalid tier', () => {
-      expect(() => metering.setUserTier('user-1', 'invalid')).toThrow('Invalid tier');
+    test('should reject invalid tier', async () => {
+      await expect(metering.setUserTier('user-1', 'invalid')).rejects.toThrow('Invalid tier');
     });
 
-    test('should emit tierChanged event', () => {
+    test('should emit tierChanged event', async () => {
       const spy = jest.fn();
       metering.on('tierChanged', spy);
       
-      metering.setUserTier('user-1', 'starter');
+      await metering.setUserTier('user-1', 'starter');
       
       expect(spy).toHaveBeenCalledWith({ userId: 'user-1', tier: 'starter' });
     });
 
-    test('should check quota for messages', () => {
-      metering.setUserTier('user-1', 'free');
+    test('should check quota for messages', async () => {
+      await metering.setUserTier('user-1', 'free');
       
       // Simulate usage up to limit
       const today = new Date().toISOString().split('T')[0];
@@ -257,8 +257,8 @@ describe('Metering', () => {
       expect(check.limit).toBe(100); // free tier limit
     });
 
-    test('should get remaining quota', () => {
-      metering.setUserTier('user-1', 'starter');
+    test('should get remaining quota', async () => {
+      await metering.setUserTier('user-1', 'starter');
       
       const today = new Date().toISOString().split('T')[0];
       metering.userUsage.set('user-1', {
@@ -282,8 +282,8 @@ describe('Metering', () => {
       expect(remaining.swarmTasks).toBe(1); // 2 - 1
     });
 
-    test('should emit quotaExceeded event', () => {
-      metering.setUserTier('user-1', 'free');
+    test('should emit quotaExceeded event', async () => {
+      await metering.setUserTier('user-1', 'free');
       
       const today = new Date().toISOString().split('T')[0];
       metering.userUsage.set('user-1', {
@@ -343,8 +343,8 @@ describe('Metering', () => {
     });
 
     test('should save user tiers to file', async () => {
-      metering.setUserTier('user-1', 'pro');
-      metering.setUserTier('user-2', 'starter');
+      await metering.setUserTier('user-1', 'pro');
+      await metering.setUserTier('user-2', 'starter');
       
       const filePath = path.join(tempDir, 'user-tiers.json');
       const content = await fs.readJson(filePath);
